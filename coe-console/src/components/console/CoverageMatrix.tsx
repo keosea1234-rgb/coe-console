@@ -15,18 +15,20 @@ const th: React.CSSProperties = {
 };
 
 function cellStyle(coverage: number): React.CSSProperties {
-  const alpha = 0.05 + Math.min(1, coverage) * 0.55;
+  const alpha = 0.08 + Math.min(1, coverage) * 0.6;
   const dark = coverage > 0.5;
   return {
-    background: `rgba(15,118,110,${alpha.toFixed(3)})`,
+    background: `rgba(30,58,138,${alpha.toFixed(3)})`,
     color: dark ? '#fff' : theme.muted5,
+    border: 'none',
+    width: '100%',
     borderRadius: 6,
     padding: '8px 6px',
     textAlign: 'center',
     fontFamily: theme.mono,
     lineHeight: 1.25,
-    transition: `transform ${theme.transitionFast} ${theme.easing}`,
-    cursor: 'default',
+    transition: `transform ${theme.transitionFast} ${theme.easing}, box-shadow ${theme.transitionFast} ${theme.easing}`,
+    cursor: 'pointer',
   };
 }
 
@@ -92,14 +94,18 @@ export function CoverageMatrix({
                   const cell = row.cells[r];
                   return (
                     <td key={r}>
-                      <div
+                      <button
+                        type="button"
+                        onClick={() => onSelect(row.category)}
                         style={cellStyle(cell.coverage)}
-                        title={`${fmtUSD(cell.sourced)} sourced`}
+                        title={`${fmtUSD(cell.sourced)} sourced — open ${row.category} deep-dive`}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.03)';
+                          e.currentTarget.style.transform = 'scale(1.04)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(15,31,74,.18)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = 'none';
                         }}
                       >
                         <div style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
@@ -108,7 +114,7 @@ export function CoverageMatrix({
                         <div style={{ fontSize: 9, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
                           {fmtUSD(cell.sourced)}
                         </div>
-                      </div>
+                      </button>
                     </td>
                   );
                 })}
