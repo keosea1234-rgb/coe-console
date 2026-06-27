@@ -5,13 +5,14 @@ function feedbackUrl(eventId: string) {
 }
 
 export function canEmailFeedback(event: SourcingEvent) {
-  return !!event.requestor && event.requestor.includes('@');
+  return !!event.id;
 }
 
 export function openFeedbackEmail(event: SourcingEvent) {
   if (!canEmailFeedback(event)) return false;
 
   const url = feedbackUrl(event.id);
+  const recipient = event.requestor?.includes('@') ? event.requestor : '';
   const subject = `Feedback request for ${event.id}`;
   const body = [
     `Hi,`,
@@ -24,6 +25,6 @@ export function openFeedbackEmail(event: SourcingEvent) {
     `Thank you.`,
   ].join('\n');
 
-  window.location.href = `mailto:${encodeURIComponent(event.requestor ?? '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   return true;
 }

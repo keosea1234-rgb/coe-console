@@ -8,7 +8,7 @@ import { STATUSES, type Status } from '../../domain/constants';
 import { useStore } from '../../domain/store';
 import { Button, StatusBadge } from '../common/primitives';
 import { Modal } from '../common/overlays';
-import { canEmailFeedback, openFeedbackEmail } from '../../lib/feedbackEmail';
+import { openFeedbackEmail } from '../../lib/feedbackEmail';
 
 const th: React.CSSProperties = {
   textAlign: 'left',
@@ -147,7 +147,9 @@ function FeedbackSurveyModal({
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: 999, background: theme.primary }} />
-          This opens an email to the event requester with the NPS survey link
+          {event?.requestor?.includes('@')
+            ? 'This opens an email to the event requester with the NPS survey link'
+            : 'This opens an email draft with the NPS survey link - add the recipient before sending'}
         </div>
         <div style={{ padding: '18px', display: 'grid', gap: 22 }}>
           <div>
@@ -334,7 +336,7 @@ export function EventRegisterTable({
                         <div style={{ display: 'flex', gap: 8 }}>
                           <FeedbackButton
                             requested={e.feedbackRequested}
-                            disabled={!canEmailFeedback(e)}
+                            disabled={false}
                             onClick={() => setFeedbackEvent(e)}
                           >
                             Ask feedback

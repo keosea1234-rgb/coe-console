@@ -66,7 +66,11 @@ export function FeedbackPage() {
   const decodedEventId = decodeURIComponent(eventId);
   const event = events.find((e) => e.id === decodedEventId);
   const existing = feedbackResponses.find((response) => response.eventId === decodedEventId);
-  const canSubmit = event?.requestor?.toLowerCase() === user?.email.toLowerCase();
+  const canSubmit = !!event && (
+    event.requestor
+      ? event.requestor.toLowerCase() === user?.email.toLowerCase()
+      : !!event.feedbackRequested
+  );
 
   const [toolScore, setToolScore] = useState<number | null>(existing?.toolScore ?? null);
   const [supportScore, setSupportScore] = useState<number | null>(existing?.supportScore ?? null);
@@ -142,7 +146,9 @@ export function FeedbackPage() {
             )}
             {event && !canSubmit && (
               <Banner kind="error">
-                This feedback link is assigned to {event.requestor ?? 'the event requestor'}.
+                {event.requestor
+                  ? `This feedback link is assigned to ${event.requestor}.`
+                  : 'Feedback has not been requested for this event yet.'}
               </Banner>
             )}
             {saved && <Banner kind="info">Feedback saved. Returning to the console...</Banner>}
