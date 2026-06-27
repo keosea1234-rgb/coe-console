@@ -13,7 +13,7 @@ create extension if not exists "pgcrypto";  -- for gen_random_uuid()
 create type region       as enum ('NA', 'EMEA', 'APAC', 'LATAM');
 create type fy           as enum ('FY25', 'FY26', 'FY27');
 create type event_type   as enum ('Forward Auction', 'Reverse Auction', 'RFQ', 'RFP', 'RFI');
-create type event_status as enum ('Planned', 'Live', 'Awarded', 'Completed');
+create type event_status as enum ('Planned', 'Live', 'Completed');
 create type directness   as enum ('Direct', 'Indirect');
 create type user_role    as enum ('user', 'admin');
 

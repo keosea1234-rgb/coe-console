@@ -22,7 +22,7 @@ export interface SourcingEvent {
   status: Status;
   addressable: number; // $ total addressable spend across all groups
   sourced: number; // $ total sourced across all groups
-  savings: number; // $ realized savings (0 unless Awarded/Completed)
+  savings: number; // $ realized savings (0 unless Completed)
   startDate: string; // ISO date
   requestor?: string;
   shouldCostModeling?: boolean;

@@ -67,15 +67,14 @@ function pickType(cat: Category, r: () => number): EventType {
 // FY-dependent status weighting: older FYs are mostly done, FY27 mostly planned.
 function pickStatus(fy: FY, r: () => number): Status {
   const x = r();
-  const w: Record<FY, [number, number, number]> = {
-    // thresholds for [Completed, Awarded, Live] — remainder = Planned
-    FY25: [0.78, 0.92, 0.98],
-    FY26: [0.35, 0.55, 0.78],
-    FY27: [0.05, 0.12, 0.22],
+  const w: Record<FY, [number, number]> = {
+    // thresholds for [Completed, Live] - remainder = Planned
+    FY25: [0.92, 0.98],
+    FY26: [0.55, 0.78],
+    FY27: [0.12, 0.22],
   };
-  const [c, a, l] = w[fy];
+  const [c, l] = w[fy];
   if (x < c) return 'Completed';
-  if (x < a) return 'Awarded';
   if (x < l) return 'Live';
   return 'Planned';
 }
@@ -128,9 +127,7 @@ export function generateEvents(seed = 20260624): SourcingEvent[] {
           const status = pickStatus(fy, rng);
           const isAuction = AUCTION_TYPES.includes(type);
           const realised =
-            status === 'Awarded' || status === 'Completed'
-              ? sourced * (isAuction ? 0.09 + rng() * 0.13 : 0.03 + rng() * 0.08)
-              : 0;
+            status === 'Completed' ? sourced * (isAuction ? 0.09 + rng() * 0.13 : 0.03 + rng() * 0.08) : 0;
 
           // pick a subcategory weighted by deterministic sub-weights
           let pick = rng();

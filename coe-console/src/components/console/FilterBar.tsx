@@ -34,9 +34,7 @@ export function FilterBar() {
   }, [events, filters, baseline]);
 
   const subcategoryOptions = useMemo(() => {
-    const cats = filters.categories.length
-      ? CATEGORIES.filter((category) => filters.categories.includes(category.name))
-      : CATEGORIES;
+    const cats = CATEGORIES.filter((category) => filters.categories.includes(category.name));
 
     return cats.flatMap((category) =>
       category.subcategories.map((subcategory) => ({
@@ -46,6 +44,8 @@ export function FilterBar() {
       })),
     );
   }, [filters.categories]);
+
+  const hasCategorySelection = filters.categories.length > 0;
 
   const hasFilters =
     filters.regions.length ||
@@ -104,12 +104,13 @@ export function FilterBar() {
 
         <MultiSelectMenu
           title="Subcategories"
-          allLabel="All subcategories"
+          allLabel={hasCategorySelection ? 'All subcategories' : 'Select category first'}
           open={openMenu === 'subcategory'}
           onOpen={() => setOpenMenu(openMenu === 'subcategory' ? null : 'subcategory')}
           selected={filters.subcategories}
           options={subcategoryOptions}
           onToggle={toggleSubcategory}
+          disabled={!hasCategorySelection}
           width={320}
         />
 
@@ -160,6 +161,7 @@ function MultiSelectMenu({
   open,
   onOpen,
   onToggle,
+  disabled = false,
   width = 240,
 }: {
   title: string;
@@ -169,6 +171,7 @@ function MultiSelectMenu({
   open: boolean;
   onOpen: () => void;
   onToggle: (value: never) => void;
+  disabled?: boolean;
   width?: number;
 }) {
   const label = selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} selected`;
@@ -178,7 +181,10 @@ function MultiSelectMenu({
     <div style={{ position: 'relative' }}>
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          if (!disabled) onOpen();
+        }}
+        disabled={disabled}
         aria-expanded={open}
         style={{
           height: 34,
@@ -190,10 +196,12 @@ function MultiSelectMenu({
           padding: '0 10px',
           borderRadius: theme.radiusSm,
           border: `1px solid ${open || selected.length ? theme.primary : theme.borderStrong}`,
-          background: selected.length ? theme.primaryMuted : theme.surface,
-          color: selected.length ? theme.primary : theme.textSecondary,
+          background: disabled ? theme.surfaceMuted : selected.length ? theme.primaryMuted : theme.surface,
+          color: disabled ? theme.textTertiary : selected.length ? theme.primary : theme.textSecondary,
           boxShadow: open ? theme.shadowFocus : 'none',
           transition: `all ${theme.transitionFast} ${theme.easing}`,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.75 : 1,
         }}
       >
         <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
@@ -201,7 +209,7 @@ function MultiSelectMenu({
             style={{
               fontSize: 9,
               fontFamily: theme.mono,
-              color: selected.length ? theme.primary : theme.textTertiary,
+              color: disabled ? theme.textTertiary : selected.length ? theme.primary : theme.textTertiary,
               textTransform: 'uppercase',
               letterSpacing: '.05em',
               lineHeight: 1,
@@ -228,7 +236,7 @@ function MultiSelectMenu({
         </span>
       </button>
 
-      {open && (
+      {open && !disabled && (
         <div
           style={{
             position: 'absolute',

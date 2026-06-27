@@ -93,16 +93,16 @@ function FeedbackCell({
   return (
     <Button
       variant="secondary"
-      disabled={event.feedbackRequested || !canEmailFeedback(event)}
+      disabled={!canEmailFeedback(event)}
       onClick={onRequest}
       style={{
         height: 28,
         padding: '6px 10px',
         fontSize: 11.5,
-        color: event.feedbackRequested || !canEmailFeedback(event) ? theme.textTertiary : theme.textSecondary,
+        color: !canEmailFeedback(event) ? theme.textTertiary : theme.textSecondary,
       }}
     >
-      {event.feedbackRequested ? 'Sent' : 'Request feedback'}
+      {event.feedbackRequested ? 'Request again' : 'Request feedback'}
     </Button>
   );
 }

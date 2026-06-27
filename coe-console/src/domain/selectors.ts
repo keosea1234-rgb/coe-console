@@ -125,7 +125,7 @@ export function computeTotals(
   return {
     events: filtered.length,
     live: filtered.filter((e) => e.status === 'Live').length,
-    done: filtered.filter((e) => e.status === 'Completed' || e.status === 'Awarded').length,
+    done: filtered.filter((e) => e.status === 'Completed').length,
     addressable,
     sourced,
     savings,
@@ -216,7 +216,7 @@ export interface StatusBucket {
   count: number;
   sourced: number;
 }
-const STATUS_ORDER: Status[] = ['Planned', 'Live', 'Awarded', 'Completed'];
+const STATUS_ORDER: Status[] = ['Planned', 'Live', 'Completed'];
 export function pipelineByStatus(filtered: SourcingEvent[]): StatusBucket[] {
   return STATUS_ORDER.map((status) => {
     const evs = filtered.filter((e) => e.status === status);

@@ -55,9 +55,9 @@ export const EVENT_TYPES: EventType[] = [
 export const AUCTION_TYPES: EventType[] = ['Forward Auction', 'Reverse Auction'];
 
 // Console statuses.
-export type Status = 'Planned' | 'Live' | 'Awarded' | 'Completed';
-export const STATUSES: Status[] = ['Planned', 'Live', 'Awarded', 'Completed'];
-export const OPERATIONAL_STATUSES: Status[] = ['Planned', 'Live', 'Completed'];
+export type Status = 'Planned' | 'Live' | 'Completed';
+export const STATUSES: Status[] = ['Planned', 'Live', 'Completed'];
+export const OPERATIONAL_STATUSES: Status[] = STATUSES;
 
 // Form-only statuses (used by the request form lifecycle).
 export type FormStatus = 'Active' | 'On hold' | 'Cancelled';
@@ -65,7 +65,6 @@ export type FormStatus = 'Active' | 'On hold' | 'Cancelled';
 export const STATUS_COLORS: Record<Status, { fg: string; bg: string }> = {
   Planned: { fg: '#94a3b8', bg: '#f1f5f9' },
   Live: { fg: '#f59e0b', bg: '#fef3e2' },
-  Awarded: { fg: '#6366f1', bg: '#eef0ff' },
   Completed: { fg: '#10b981', bg: '#e7f8f0' },
 };
 

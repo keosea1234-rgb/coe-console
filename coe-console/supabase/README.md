@@ -16,6 +16,7 @@ Open **SQL Editor -> New query** in the Supabase dashboard and run the files in 
 2. `migrations/0002_rls.sql` - row-level security policies.
 3. `migrations/0003_event_id_text.sql` - event id type alignment.
 4. `migrations/0004_feedback_responses.sql` - NPS feedback response storage and RLS.
+5. `migrations/0005_remove_awarded_status.sql` - collapses Awarded events into Completed and removes the enum label.
 
 For each file: paste the contents -> **Run**. You should see a "Success. No rows returned." message. If a statement fails partway through, fix the cause and re-run the whole file.
 

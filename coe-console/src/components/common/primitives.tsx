@@ -108,6 +108,7 @@ export function SegmentedControl<T extends string>({
           <button
             key={o.value}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(o.value)}
             style={{
               flex: fullWidth ? 1 : undefined,
@@ -120,6 +121,7 @@ export function SegmentedControl<T extends string>({
               color: active ? theme.ink : theme.textSecondary,
               boxShadow: active ? '0 1px 2px rgba(15,23,42,.06)' : 'none',
               transition: `all ${theme.transitionFast} ${theme.easing}`,
+              cursor: 'pointer',
             }}
           >
             {o.label}

@@ -88,7 +88,7 @@ export const useStore = create<ConsoleState>((set, get) => ({
           categories,
           subcategories: categories.length
             ? s.filters.subcategories.filter((sub) => allowedSubs.has(sub))
-            : s.filters.subcategories,
+            : [],
         },
       };
     }),

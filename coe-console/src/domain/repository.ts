@@ -15,7 +15,7 @@ interface SourcingEventRow {
   business_groups: BusinessGroup[] | null;
   type: EventType;
   event_types: EventType[] | null;
-  status: Status;
+  status: Status | 'Awarded';
   addressable: number | string;
   sourced: number | string;
   savings: number | string;
@@ -54,6 +54,8 @@ const num = (v: number | string) => (typeof v === 'string' ? Number(v) : v);
 
 // undefined → null for fields that are nullable in DB.
 const opt = <T>(v: T | undefined): T | null => (v === undefined ? null : v);
+const normalizeStatus = (status: SourcingEventRow['status']): Status =>
+  status === 'Awarded' ? 'Completed' : status;
 
 export function rowToEvent(r: SourcingEventRow): SourcingEvent {
   return {
@@ -67,7 +69,7 @@ export function rowToEvent(r: SourcingEventRow): SourcingEvent {
     businessGroups: r.business_groups ?? undefined,
     type: r.type,
     eventTypes: r.event_types ?? undefined,
-    status: r.status,
+    status: normalizeStatus(r.status),
     addressable: num(r.addressable),
     sourced: num(r.sourced),
     savings: num(r.savings),

@@ -57,17 +57,17 @@ function FeedbackButton({
   return (
     <Button
       variant="secondary"
-      disabled={requested || disabled}
+      disabled={disabled}
       onClick={onClick}
       style={{
         height: 28,
         padding: '6px 9px',
         fontSize: 11.5,
-        borderColor: requested || disabled ? theme.border : theme.borderStrong,
-        color: requested || disabled ? theme.textTertiary : theme.textSecondary,
+        borderColor: disabled ? theme.border : theme.borderStrong,
+        color: disabled ? theme.textTertiary : theme.textSecondary,
       }}
     >
-      {requested ? 'Sent' : children}
+      {requested ? 'Ask again' : children}
     </Button>
   );
 }
