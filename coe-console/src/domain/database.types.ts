@@ -12,6 +12,84 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      client_errors: {
+        Row: {
+          id: string;
+          source: 'error-boundary' | 'window-error' | 'unhandled-rejection';
+          message: string;
+          stack: string | null;
+          component_stack: string | null;
+          route: string | null;
+          user_agent: string | null;
+          app_version: string | null;
+          actor_id: string | null;
+          actor_email: string | null;
+          reported_at: string;
+        };
+        Insert: {
+          id?: string;
+          source: 'error-boundary' | 'window-error' | 'unhandled-rejection';
+          message: string;
+          stack?: string | null;
+          component_stack?: string | null;
+          route?: string | null;
+          user_agent?: string | null;
+          app_version?: string | null;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          reported_at?: string;
+        };
+        Update: {
+          id?: string;
+          source?: 'error-boundary' | 'window-error' | 'unhandled-rejection';
+          message?: string;
+          stack?: string | null;
+          component_stack?: string | null;
+          route?: string | null;
+          user_agent?: string | null;
+          app_version?: string | null;
+          actor_id?: string | null;
+          actor_email?: string | null;
+          reported_at?: string;
+        };
+        Relationships: [];
+      };
+      event_attachments: {
+        Row: {
+          id: string;
+          event_id: string;
+          doc_type: string;
+          file_name: string;
+          storage_path: string;
+          content_type: string | null;
+          size_bytes: number;
+          uploaded_by: string | null;
+          uploaded_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          doc_type: string;
+          file_name: string;
+          storage_path: string;
+          content_type?: string | null;
+          size_bytes: number;
+          uploaded_by?: string | null;
+          uploaded_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          doc_type?: string;
+          file_name?: string;
+          storage_path?: string;
+          content_type?: string | null;
+          size_bytes?: number;
+          uploaded_by?: string | null;
+          uploaded_at?: string;
+        };
+        Relationships: [];
+      };
       audit_log: {
         Row: {
           id: string;

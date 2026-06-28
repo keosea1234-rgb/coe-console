@@ -20,6 +20,9 @@ Open **SQL Editor -> New query** in the Supabase dashboard and run the files in 
 6. `migrations/0006_feedback_for_unassigned_events.sql` - allows feedback submissions for admin-requested events without a stored requestor.
 7. `migrations/0007_audit_log.sql` - append-only audit trail for event, baseline, and feedback changes.
 8. `migrations/0008_request_archive.sql` - admin archive workflow for user-submitted requests.
+9. `migrations/0009_event_attachments.sql` - storage bucket + metadata table for request attachments.
+10. `migrations/0010_client_errors.sql` - sink table for client runtime error reports (admins read; clients append-only).
+11. `migrations/0011_audit_log_retention.sql` - prune function + optional pg_cron daily schedule for `audit_log` retention.
 
 For each file: paste the contents -> **Run**. You should see a "Success. No rows returned." message. If a statement fails partway through, fix the cause and re-run the whole file.
 
@@ -84,6 +87,8 @@ This reloads the deterministic `generateEvents()` dataset into
 | `spend_baseline`     | Addressable spend per (fy, category, region) cell.            |
 | `feedback_responses` | Requestor NPS feedback submitted from email survey links.     |
 | `audit_log`          | Append-only audit trail for security-sensitive data changes.  |
+| `event_attachments`  | Metadata for files uploaded against a request. Binary in storage. |
+| `client_errors`      | Production client runtime errors (boundary, window, rejections). |
 
 ## RLS cheat sheet
 
@@ -94,6 +99,48 @@ This reloads the deterministic `generateEvents()` dataset into
 | `spend_baseline`     | any signed-in | admin only               | admin only               | admin only                |
 | `feedback_responses` | admin / own   | own requested event only | own requested event only | blocked                   |
 | `audit_log`          | admin only    | trigger only             | blocked                  | blocked                   |
+| `event_attachments`  | any signed-in | self (uploaded_by = uid) | blocked                  | admin or uploader         |
+| `client_errors`      | admin only    | self or anon             | blocked                  | blocked                   |
+
+## Audit log retention
+
+`0011_audit_log_retention.sql` adds `public.prune_audit_log(retention_days int default 180)`
+which deletes rows older than the cutoff. On Supabase Pro/Team it also wires
+a `pg_cron` job named `prune_audit_log_daily` that runs nightly at 03:00 UTC.
+On Free tier pg_cron isn't available — invoke the function manually or from
+an external scheduler:
+
+```sql
+select public.prune_audit_log(180);
+```
+
+To verify the schedule was registered (Pro/Team):
+
+```sql
+select jobname, schedule, command from cron.job where jobname = 'prune_audit_log_daily';
+```
+
+## RLS smoke tests
+
+`tests/rls.test.ts` exercises real RLS policies against a throwaway Supabase
+project. Provide these env vars (locally via `.env.test.local`, in CI via
+secrets) to enable the suite:
+
+```
+SUPABASE_TEST_URL=
+SUPABASE_TEST_ANON_KEY=
+SUPABASE_TEST_USER_EMAIL=
+SUPABASE_TEST_USER_PASSWORD=
+SUPABASE_TEST_ADMIN_EMAIL=
+SUPABASE_TEST_ADMIN_PASSWORD=
+```
+
+Preconditions:
+- Test project has every migration applied.
+- One profile is promoted to `admin`; another remains `user`.
+- At least one seeded (non-request) event exists in `sourcing_events`.
+
+When any env var is missing the tests skip cleanly so local runs are unaffected.
 
 ## Audit log smoke test
 

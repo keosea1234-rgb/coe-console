@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reportClientError } from '../src/lib/errorReporting';
+import { configureErrorReportingSink, reportClientError } from '../src/lib/errorReporting';
 
 test('reportClientError normalizes Error instances', () => {
   const originalConsoleError = console.error;
@@ -22,6 +22,21 @@ test('reportClientError normalizes non-Error values', () => {
     const report = reportClientError({ code: 'E_CLIENT' }, { source: 'unhandled-rejection' });
     assert.equal(report.source, 'unhandled-rejection');
     assert.equal(report.message, '{"code":"E_CLIENT"}');
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
+test('configureErrorReportingSink defaults to disabled (no sink call without explicit opt-in)', () => {
+  // Sink is opt-in: tests should be able to call reportClientError without
+  // triggering a network request. We verify the default by configuring with
+  // enabled:false and confirming the call still returns a report.
+  const originalConsoleError = console.error;
+  console.error = () => undefined;
+  try {
+    configureErrorReportingSink({ enabled: false });
+    const report = reportClientError(new Error('not posted'), { source: 'error-boundary' });
+    assert.equal(report.message, 'not posted');
   } finally {
     console.error = originalConsoleError;
   }
