@@ -31,19 +31,22 @@ import {
   isValidEmail,
   prefersAmcorEmail,
 } from '../domain/eventFormHelpers';
+import {
+  buildRequestEvent,
+  validateRequestEventInput,
+  type Directness,
+  type FyOverride,
+  type GroupMode,
+  type RequestEventInput,
+  type RequestGroupRow,
+} from '../domain/requestIntake';
 import { fmtUSD } from '../domain/selectors';
 import { useStore } from '../domain/store';
 import { useSession } from '../domain/session';
 import { theme, numeric, sectionLabel } from '../styles/theme';
 
-type FyOverride = 'auto' | FY;
-type GroupMode = 'single' | 'multiple';
-type Directness = 'Direct' | 'Indirect';
-
-interface BusinessGroupRow {
+interface BusinessGroupRow extends RequestGroupRow {
   key: string;
-  region: Region;
-  spend: number;
 }
 
 type DocType = 'Bid Template' | 'RFI Questionnaire' | 'Supplier List' | 'Specification' | 'Other';
@@ -433,31 +436,25 @@ export function RequestFormPage() {
     setAttachments((prev) => prev.filter((attachment) => attachment.key !== key));
   };
 
+  const currentRequestInput = (): RequestEventInput => ({
+    eventDate,
+    status,
+    resolvedFy,
+    eventId,
+    eventTypes,
+    requestorEmail,
+    groupMode,
+    groupRows,
+    directness,
+    category,
+    subcategory,
+    shouldCostModeling,
+    riskAssessment,
+    esgAssessment,
+  });
+
   const validate = (): boolean => {
-    const next: Record<string, string> = {};
-
-    if (!eventDate) next.eventDate = 'Event date is required.';
-    if (eventTypes.length === 0) next.eventType = 'Select at least one event type.';
-    if (!requestorEmail.trim()) {
-      next.requestorEmail = 'Requestor email is required.';
-    } else if (!isValidEmail(requestorEmail)) {
-      next.requestorEmail = 'Enter a valid email address.';
-    }
-    if (!category) next.category = 'Category is required.';
-    if (!subcategory) next.subcategory = 'Subcategory is required.';
-
-    const activeRows = groupMode === 'single' ? groupRows.slice(0, 1) : groupRows;
-    const withSpend = activeRows.filter((r) => r.spend > 0);
-    if (withSpend.length === 0) {
-      next.spend = 'Enter spend greater than zero for at least one business group.';
-    }
-    const duplicateRegion = withSpend.find((row, index) => withSpend.some((other, i) => i !== index && other.region === row.region));
-    if (duplicateRegion) next.spend = `${duplicateRegion.region} is entered more than once. Use one row per business group.`;
-    if (!eventId.trim()) next.eventId = 'Event ID is required.';
-    if (events.some((event) => event.id === eventId)) {
-      next.eventId = 'Event ID already exists. Use a new ID or fiscal year.';
-    }
-
+    const next = validateRequestEventInput(currentRequestInput(), events);
     setErrors(next);
     if (!next.requestorEmail && requestorEmail && !prefersAmcorEmail(requestorEmail)) {
       setEmailHint('Prefer an @amcor.com address when available.');
@@ -472,40 +469,7 @@ export function RequestFormPage() {
     e.preventDefault();
     if (!validate()) return;
 
-    const activeRows = (groupMode === 'single' ? groupRows.slice(0, 1) : groupRows).filter(
-      (r) => r.spend > 0,
-    );
-    const totalSpend = activeRows.reduce((s, r) => s + r.spend, 0);
-    const regions = activeRows.map((r) => r.region) as Region[];
-    const businessGroups = activeRows.map((r) => ({
-      region: r.region,
-      addressable: Math.round(r.spend),
-      sourced: Math.round(r.spend),
-    }));
-
-    addEvent({
-      id: eventId,
-      name: `${category} - ${subcategory}`,
-      fy: resolvedFy,
-      category,
-      subcategory,
-      region: activeRows[0].region,
-      regions,
-      businessGroups,
-      type: eventTypes[0],
-      eventTypes,
-      status,
-      addressable: Math.round(totalSpend),
-      sourced: Math.round(totalSpend),
-      savings: 0,
-      startDate: eventDate,
-      requestor: requestorEmail.trim(),
-      shouldCostModeling,
-      riskAssessment,
-      esgAssessment,
-      directness,
-      requestCreatedAt: new Date().toISOString(),
-    });
+    addEvent(buildRequestEvent(currentRequestInput(), new Date().toISOString()));
 
     window.localStorage.removeItem(REQUEST_DRAFT_KEY);
     setDraftSavedAt(null);

@@ -15,6 +15,7 @@ Open the URL Vite prints (default http://localhost:5173).
 
 ```bash
 npm run build     # type-check + production build into /dist
+npm run test:run  # selector + store workflow tests
 npm run preview   # serve the production build locally
 ```
 
@@ -27,8 +28,13 @@ src/
     categories.ts    19 categories: colors, base spend, subcategories
     types.ts         SourcingEvent
     generateEvents.ts seeded PRNG synthetic dataset (deterministic)
-    selectors.ts     filtering, aggregation, coverage, deep-dive, formatters
-    store.ts         zustand store (events, filters, spend baseline)
+    selectors.ts         filtering, aggregation, coverage, deep-dive, formatters
+    store.ts             production zustand store entry point
+    storeFactory.ts      dependency-injected store factory for tests
+    storeFilters.ts      client/UI filter state
+    storeServerState.ts  Supabase-backed server state + mutations
+    repository.ts        Supabase repository and row mappers
+    database.types.ts    local Supabase Database type contract
   components/
     common/        Card, primitives (KPI, chips, selects…), overlays
     console/       TopBar, FilterBar, KpiRow, charts, matrix, grid, modals
@@ -39,23 +45,56 @@ src/
 
 ### Data flow (today vs. next phase)
 
-All numbers derive from the event store. New events go through `store.addEvent()`,
-which is the integration point for Phase 2: when the request form submits a Buyer
-request, it pushes an event and every console figure (coverage, pipeline, savings)
-recomputes automatically. The seeded generator (`generateEvents`) will simply be
-swapped for the Supabase fetch.
+All numbers derive from the event store. Client state (filters) lives in
+`storeFilters.ts`; server state (events, baseline, feedback and mutations) lives
+in `storeServerState.ts`. New events go through `store.addEvent()`: when the
+request form submits a Buyer request, it pushes an event and every console figure
+(coverage, pipeline, savings) recomputes automatically.
 
 The editable **Spend data** tab persists the addressable baseline to Supabase;
 coverage = sourced / baseline.
 
+## Reliability checks
+
+```bash
+npm run lint      # TypeScript project check
+npm run test:run  # Node test runner through tsx
+npm run deploy:check # Vercel rewrite/header guard
+npm run build     # type-check + Vite production build
+```
+
+Covered tests:
+
+- KPI, coverage, region attribution, pipeline and savings trend selectors.
+- Request form validation and event payload creation.
+- Request intake -> admin status/feedback/archive -> buyer feedback store workflow.
+- Client error reporting normalization.
+
+## Supabase types
+
+`src/domain/database.types.ts` is the local typed contract used by the Supabase
+client. After linking the Supabase CLI to the project, refresh it from the live
+schema with:
+
+```bash
+npm run supabase:types
+```
+
 ## Deploy to Vercel
 
 1. Push this folder to a Git repo.
+2. If the Git repository root contains the `coe-console/` folder, set Vercel
+   **Root Directory** to `coe-console`.
 2. In Vercel: **New Project → Import**. Framework preset = **Vite** (auto-detected).
 3. Build command `npm run build`, output directory `dist` (defaults are correct).
 4. `vercel.json` already adds the SPA rewrite so deep links (e.g. `/new-request`) work.
+5. Make sure the Production domain points at this same Vercel project/root.
 
 Or from the CLI: `npm i -g vercel && vercel`.
+
+GitHub Actions CI runs `npm ci`, `npm run lint`, `npm run test:run`,
+`npm run deploy:check`, and `npm run build` from the `coe-console` root before
+deploy/merge.
 
 ## Environment variables
 
