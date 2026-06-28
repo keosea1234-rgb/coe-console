@@ -18,6 +18,8 @@ Open **SQL Editor -> New query** in the Supabase dashboard and run the files in 
 4. `migrations/0004_feedback_responses.sql` - NPS feedback response storage and RLS.
 5. `migrations/0005_remove_awarded_status.sql` - collapses Awarded events into Completed and removes the enum label.
 6. `migrations/0006_feedback_for_unassigned_events.sql` - allows feedback submissions for admin-requested events without a stored requestor.
+7. `migrations/0007_audit_log.sql` - append-only audit trail for event, baseline, and feedback changes.
+8. `migrations/0008_request_archive.sql` - admin archive workflow for user-submitted requests.
 
 For each file: paste the contents -> **Run**. You should see a "Success. No rows returned." message. If a statement fails partway through, fix the cause and re-run the whole file.
 
@@ -81,6 +83,7 @@ This reloads the deterministic `generateEvents()` dataset into
 | `sourcing_events`    | All events - both seeded executive data and user requests.    |
 | `spend_baseline`     | Addressable spend per (fy, category, region) cell.            |
 | `feedback_responses` | Requestor NPS feedback submitted from email survey links.     |
+| `audit_log`          | Append-only audit trail for security-sensitive data changes.  |
 
 ## RLS cheat sheet
 
@@ -90,3 +93,16 @@ This reloads the deterministic `generateEvents()` dataset into
 | `sourcing_events`    | any signed-in | self request / admin     | admin or own planned     | admin or own planned      |
 | `spend_baseline`     | any signed-in | admin only               | admin only               | admin only                |
 | `feedback_responses` | admin / own   | own requested event only | own requested event only | blocked                   |
+| `audit_log`          | admin only    | trigger only             | blocked                  | blocked                   |
+
+## Audit log smoke test
+
+After running `0007_audit_log.sql`, sign in as an admin, change an event status
+or edit a spend baseline cell, then verify:
+
+```sql
+select table_name, operation, record_id, actor_email, changed_fields, created_at
+from public.audit_log
+order by created_at desc
+limit 10;
+```

@@ -111,8 +111,8 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const updateEventStatus = useStore((s) => s.updateEventStatus);
   const requestEventFeedback = useStore((s) => s.requestEventFeedback);
   const feedbackResponses = useStore((s) => s.feedbackResponses);
-  const removeEvent = useStore((s) => s.removeEvent);
-  const [filter, setFilter] = useState<'all' | 'new'>('all');
+  const archiveEvent = useStore((s) => s.archiveEvent);
+  const [filter, setFilter] = useState<'active' | 'new' | 'archived' | 'all'>('active');
 
   const requests = useMemo(
     () =>
@@ -122,15 +122,18 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
     [events],
   );
 
-  const visible = useMemo(
-    () =>
-      filter === 'new'
-        ? requests.filter((e) => e.status === 'Planned' || e.status === 'Live')
-        : requests,
-    [requests, filter],
-  );
+  const visible = useMemo(() => {
+    if (filter === 'new') {
+      return requests.filter((e) => !e.archivedAt && (e.status === 'Planned' || e.status === 'Live'));
+    }
+    if (filter === 'archived') return requests.filter((e) => !!e.archivedAt);
+    if (filter === 'all') return requests;
+    return requests.filter((e) => !e.archivedAt);
+  }, [requests, filter]);
 
   const totalSpend = visible.reduce((sum, e) => sum + (e.addressable || 0), 0);
+  const activeCount = requests.filter((e) => !e.archivedAt).length;
+  const archivedCount = requests.length - activeCount;
 
   return (
     <Card pad={0}>
@@ -172,7 +175,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
               border: `1px solid ${theme.border}`,
             }}
           >
-            {(['all', 'new'] as const).map((f) => {
+            {(['active', 'new', 'archived', 'all'] as const).map((f) => {
               const active = filter === f;
               return (
                 <button
@@ -193,7 +196,13 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                     textTransform: 'capitalize',
                   }}
                 >
-                  {f === 'new' ? 'Open only' : 'All'}
+                  {f === 'new'
+                    ? 'Open'
+                    : f === 'active'
+                      ? `Active (${activeCount})`
+                      : f === 'archived'
+                        ? `Archived (${archivedCount})`
+                        : 'All'}
                 </button>
               );
             })}
@@ -227,6 +236,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                 const cat = CATEGORY_BY_NAME[e.category];
                 const isFresh =
                   e.requestCreatedAt &&
+                  !e.archivedAt &&
                   Date.now() - new Date(e.requestCreatedAt).getTime() < 24 * 60 * 60 * 1000;
                 return (
                   <tr key={e.id}>
@@ -245,6 +255,22 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                             }}
                           >
                             NEW
+                          </span>
+                        )}
+                        {e.archivedAt && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 800,
+                              fontFamily: theme.mono,
+                              padding: '2px 5px',
+                              borderRadius: 3,
+                              background: theme.surfaceMuted,
+                              color: theme.textTertiary,
+                              border: `1px solid ${theme.border}`,
+                            }}
+                          >
+                            ARCHIVED
                           </span>
                         )}
                         <span style={{ fontFamily: theme.mono, fontSize: 11.5, color: theme.textSecondary }}>
@@ -325,10 +351,21 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                     <td style={td}>
                       <Button
                         variant="ghost"
-                        onClick={() => removeEvent(e.id)}
-                        style={{ height: 28, padding: '6px 9px', fontSize: 11.5, color: theme.danger }}
+                        disabled={!!e.archivedAt}
+                        onClick={() => {
+                          const ok = window.confirm(
+                            `Archive ${e.id}? It will leave the active inbox but remain available for audit.`,
+                          );
+                          if (ok) void archiveEvent(e.id);
+                        }}
+                        style={{
+                          height: 28,
+                          padding: '6px 9px',
+                          fontSize: 11.5,
+                          color: e.archivedAt ? theme.textTertiary : theme.textSecondary,
+                        }}
                       >
-                        Delete
+                        {e.archivedAt ? 'Archived' : 'Archive'}
                       </Button>
                     </td>
                   </tr>

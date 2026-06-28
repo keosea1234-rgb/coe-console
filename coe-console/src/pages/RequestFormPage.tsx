@@ -54,6 +54,27 @@ interface AttachmentRow {
   file: File;
 }
 
+interface RequestDraft {
+  eventDate: string;
+  status: Status;
+  statusTouched: boolean;
+  fyOverride: FyOverride;
+  eventId: string;
+  eventIdTouched: boolean;
+  eventTypes: EventType[];
+  requestorEmail: string;
+  groupMode: GroupMode;
+  groupRows: BusinessGroupRow[];
+  directness: Directness;
+  category: string;
+  subcategory: string;
+  shouldCostModeling: boolean;
+  riskAssessment: boolean;
+  esgAssessment: boolean;
+  docType: DocType;
+  savedAt: string;
+}
+
 const DOC_TYPES: DocType[] = [
   'Bid Template',
   'RFI Questionnaire',
@@ -61,6 +82,8 @@ const DOC_TYPES: DocType[] = [
   'Specification',
   'Other',
 ];
+
+const REQUEST_DRAFT_KEY = 'coe-console:new-event-request:draft';
 
 function todayIso() {
   const today = new Date();
@@ -72,6 +95,13 @@ const DEFAULT_DATE = todayIso();
 let rowKey = 0;
 function nextKey() {
   return `row-${++rowKey}`;
+}
+
+function fmtDraftSavedAt(iso: string | null) {
+  if (!iso) return 'Not saved yet';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Draft saved';
+  return `Draft saved ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 function EventTypeDropdown({
@@ -236,6 +266,9 @@ export function RequestFormPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [emailHint, setEmailHint] = useState<string | undefined>();
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const autoFy = useMemo(() => getFiscalYearFromDate(eventDate), [eventDate]);
   const resolvedFy: FY = fyOverride === 'auto' ? autoFy : fyOverride;
@@ -269,6 +302,103 @@ export function RequestFormPage() {
       setEventId(generateNextEventId(resolvedFy, events));
     }
   }, [resolvedFy, events, eventIdTouched]);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(REQUEST_DRAFT_KEY);
+    if (!raw) {
+      setDraftLoaded(true);
+      return;
+    }
+
+    try {
+      const draft = JSON.parse(raw) as Partial<RequestDraft>;
+      if (draft.eventDate) setEventDate(draft.eventDate);
+      if (draft.status && STATUSES.includes(draft.status)) setStatus(draft.status);
+      if (typeof draft.statusTouched === 'boolean') setStatusTouched(draft.statusTouched);
+      if (draft.fyOverride && (draft.fyOverride === 'auto' || FYS.includes(draft.fyOverride))) {
+        setFyOverride(draft.fyOverride);
+      }
+      if (draft.eventId) setEventId(draft.eventId);
+      if (typeof draft.eventIdTouched === 'boolean') setEventIdTouched(draft.eventIdTouched);
+      if (Array.isArray(draft.eventTypes) && draft.eventTypes.length) {
+        setEventTypes(draft.eventTypes.filter((type): type is EventType => EVENT_TYPES.includes(type)));
+      }
+      if (draft.requestorEmail) setRequestorEmail(draft.requestorEmail);
+      if (draft.groupMode === 'single' || draft.groupMode === 'multiple') setGroupMode(draft.groupMode);
+      if (Array.isArray(draft.groupRows) && draft.groupRows.length) {
+        setGroupRows(
+          draft.groupRows
+            .filter((row) => REGIONS.includes(row.region))
+            .map((row) => ({ key: row.key || nextKey(), region: row.region, spend: Number(row.spend) || 0 })),
+        );
+      }
+      if (draft.directness === 'Direct' || draft.directness === 'Indirect') setDirectness(draft.directness);
+      if (draft.category && CATEGORY_BY_NAME[draft.category]) setCategory(draft.category);
+      if (draft.subcategory) setSubcategory(draft.subcategory);
+      if (typeof draft.shouldCostModeling === 'boolean') setShouldCostModeling(draft.shouldCostModeling);
+      if (typeof draft.riskAssessment === 'boolean') setRiskAssessment(draft.riskAssessment);
+      if (typeof draft.esgAssessment === 'boolean') setEsgAssessment(draft.esgAssessment);
+      if (draft.docType && DOC_TYPES.includes(draft.docType)) setDocType(draft.docType);
+      setDraftSavedAt(draft.savedAt ?? null);
+      setDraftRestored(true);
+    } catch (err) {
+      console.warn('[request-form] failed to restore draft', err);
+      window.localStorage.removeItem(REQUEST_DRAFT_KEY);
+    } finally {
+      setDraftLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded || saved) return;
+    const handle = window.setTimeout(() => {
+      const savedAt = new Date().toISOString();
+      const draft: RequestDraft = {
+        eventDate,
+        status,
+        statusTouched,
+        fyOverride,
+        eventId,
+        eventIdTouched,
+        eventTypes,
+        requestorEmail,
+        groupMode,
+        groupRows,
+        directness,
+        category,
+        subcategory,
+        shouldCostModeling,
+        riskAssessment,
+        esgAssessment,
+        docType,
+        savedAt,
+      };
+      window.localStorage.setItem(REQUEST_DRAFT_KEY, JSON.stringify(draft));
+      setDraftSavedAt(savedAt);
+    }, 600);
+
+    return () => window.clearTimeout(handle);
+  }, [
+    draftLoaded,
+    saved,
+    eventDate,
+    status,
+    statusTouched,
+    fyOverride,
+    eventId,
+    eventIdTouched,
+    eventTypes,
+    requestorEmail,
+    groupMode,
+    groupRows,
+    directness,
+    category,
+    subcategory,
+    shouldCostModeling,
+    riskAssessment,
+    esgAssessment,
+    docType,
+  ]);
 
   const handleCategoryChange = useCallback((cat: string) => {
     setCategory(cat);
@@ -377,6 +507,9 @@ export function RequestFormPage() {
       requestCreatedAt: new Date().toISOString(),
     });
 
+    window.localStorage.removeItem(REQUEST_DRAFT_KEY);
+    setDraftSavedAt(null);
+    setDraftRestored(false);
     setSaved(true);
     window.setTimeout(() => navigate('/'), 600);
   };
@@ -385,6 +518,13 @@ export function RequestFormPage() {
     { value: 'auto', label: `Auto (${autoFy})` },
     ...FYS.map((fy) => ({ value: fy, label: fy })),
   ];
+  const errorEntries = Object.entries(errors);
+
+  const clearDraft = () => {
+    window.localStorage.removeItem(REQUEST_DRAFT_KEY);
+    setDraftSavedAt(null);
+    setDraftRestored(false);
+  };
 
   return (
     <div className="app-shell request-page">
@@ -464,6 +604,58 @@ export function RequestFormPage() {
 
       <form id="event-form" onSubmit={handleSubmit} noValidate className="form-layout">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div
+            role="status"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '10px 13px',
+              borderRadius: theme.radiusSm,
+              background: draftRestored ? theme.infoBg : theme.surfaceMuted,
+              border: `1px solid ${draftRestored ? theme.info : theme.border}`,
+              color: draftRestored ? theme.info : theme.textSecondary,
+              fontSize: 12.5,
+              fontWeight: 650,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>
+              {draftRestored
+                ? `${fmtDraftSavedAt(draftSavedAt)} - restored automatically`
+                : fmtDraftSavedAt(draftSavedAt)}
+            </span>
+            {draftSavedAt && (
+              <button
+                type="button"
+                onClick={clearDraft}
+                className="ui-btn ui-btn--ghost"
+                style={{ height: 26, padding: '4px 8px', fontSize: 11.5 }}
+              >
+                Clear draft
+              </button>
+            )}
+          </div>
+
+          {errorEntries.length > 0 && (
+            <div
+              role="alert"
+              style={{
+                padding: '11px 13px',
+                borderRadius: theme.radiusSm,
+                background: theme.dangerBg,
+                border: `1px solid ${theme.danger}40`,
+                color: theme.danger,
+                fontSize: 12.5,
+                lineHeight: 1.45,
+              }}
+            >
+              <strong style={{ display: 'block', marginBottom: 4 }}>Please fix {errorEntries.length} field issue{errorEntries.length === 1 ? '' : 's'}.</strong>
+              <span>{errorEntries.map(([, message]) => message).join(' ')}</span>
+            </div>
+          )}
+
           <Card>
             <FormSection title="Event basics" complete={basicsComplete}>
               <FieldGrid>

@@ -56,7 +56,7 @@ export function ConsolePage() {
   const pendingRequests = useMemo(
     () =>
       events.filter(
-        (e) => !!e.requestCreatedAt && (e.status === 'Planned' || e.status === 'Live'),
+        (e) => !e.archivedAt && !!e.requestCreatedAt && (e.status === 'Planned' || e.status === 'Live'),
       ).length,
     [events],
   );

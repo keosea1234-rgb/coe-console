@@ -33,6 +33,7 @@ interface ConsoleState {
   refreshEvents: () => Promise<void>;
   addEvent: (e: SourcingEvent) => Promise<void>;
   removeEvent: (id: string) => Promise<void>;
+  archiveEvent: (id: string) => Promise<void>;
   updateEventStatus: (id: string, status: Status) => Promise<void>;
   requestEventFeedback: (id: string) => Promise<void>;
   refreshFeedbackResponses: () => Promise<void>;
@@ -163,6 +164,28 @@ export const useStore = create<ConsoleState>((set, get) => ({
       await repo.deleteEvent(id);
     } catch (err) {
       console.error('[store] deleteEvent failed; reverting', err);
+      set({ events: prev, error: (err as Error).message });
+    }
+  },
+
+  archiveEvent: async (id) => {
+    const user = useSession.getState().user;
+    if (!user) {
+      set({ error: 'Sign in before archiving a request.' });
+      return;
+    }
+
+    const prev = get().events;
+    const archivedAt = new Date().toISOString();
+    set({
+      events: prev.map((e) =>
+        e.id === id ? { ...e, archivedAt, archivedBy: user.id } : e,
+      ),
+    });
+    try {
+      await repo.archiveEvent(id, user.id);
+    } catch (err) {
+      console.error('[store] archiveEvent failed; reverting', err);
       set({ events: prev, error: (err as Error).message });
     }
   },

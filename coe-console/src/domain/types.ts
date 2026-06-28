@@ -31,6 +31,8 @@ export interface SourcingEvent {
   directness?: 'Direct' | 'Indirect';
   feedbackRequested?: boolean;
   requestCreatedAt?: string;
+  archivedAt?: string;
+  archivedBy?: string;
 }
 
 export interface FeedbackResponse {

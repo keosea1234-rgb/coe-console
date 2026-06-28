@@ -28,6 +28,8 @@ interface SourcingEventRow {
   directness: 'Direct' | 'Indirect' | null;
   feedback_requested: boolean;
   request_created_at: string | null;
+  archived_at?: string | null;
+  archived_by?: string | null;
 }
 
 interface SpendBaselineRow {
@@ -81,6 +83,8 @@ export function rowToEvent(r: SourcingEventRow): SourcingEvent {
     directness: r.directness ?? undefined,
     feedbackRequested: r.feedback_requested || undefined,
     requestCreatedAt: r.request_created_at ?? undefined,
+    archivedAt: r.archived_at ?? undefined,
+    archivedBy: r.archived_by ?? undefined,
   };
 }
 
@@ -145,6 +149,14 @@ export async function insertEvent(e: SourcingEvent, requestorId: string | null) 
 
 export async function deleteEvent(id: string) {
   const { error } = await supabase.from('sourcing_events').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function archiveEvent(id: string, actorId: string) {
+  const { error } = await supabase
+    .from('sourcing_events')
+    .update({ archived_at: new Date().toISOString(), archived_by: actorId })
+    .eq('id', id);
   if (error) throw error;
 }
 
