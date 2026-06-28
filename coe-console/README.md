@@ -68,7 +68,28 @@ Covered tests:
 - KPI, coverage, region attribution, pipeline and savings trend selectors.
 - Request form validation and event payload creation.
 - Request intake -> admin status/feedback/archive -> buyer feedback store workflow.
-- Client error reporting normalization.
+- Client error reporting normalization + sink opt-in safety.
+- RLS smoke suite (`tests/rls.test.ts`) — skipped without `SUPABASE_TEST_*`
+  env vars; see `supabase/README.md` for the setup runbook.
+
+## End-to-end (Playwright)
+
+Playwright drives the production preview against a real Supabase test project.
+It is opt-in: locally and in CI, the suite skips unless credentials are set.
+
+```bash
+npm install
+npm run test:e2e:install   # download chromium with system deps
+npm run build              # produces /dist that `npm run preview` serves
+E2E_USER_EMAIL=... E2E_USER_PASSWORD=... \
+E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... \
+VITE_SUPABASE_URL=... VITE_SUPABASE_ANON_KEY=... \
+  npm run test:e2e
+```
+
+In CI the `e2e` job runs only when the repository variable `E2E_ENABLED` is
+`true` and the secrets above are configured. Optional vars enable the feedback
+flow: `E2E_FEEDBACK_EVENT_ID`, `E2E_FEEDBACK_TOKEN`.
 
 ## Supabase types
 

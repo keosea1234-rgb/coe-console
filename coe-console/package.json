@@ -10,6 +10,8 @@
     "lint": "tsc -b --noEmit",
     "test": "npm run test:run",
     "test:run": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
     "deploy:check": "tsx scripts/checkDeployConfig.ts",
     "supabase:types": "supabase gen types typescript --linked --schema public > src/domain/database.types.ts",
     "seed": "tsx scripts/seed.ts"
@@ -22,6 +24,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

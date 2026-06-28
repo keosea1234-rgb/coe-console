@@ -40,6 +40,12 @@ import {
   type RequestEventInput,
   type RequestGroupRow,
 } from '../domain/requestIntake';
+import {
+  ALLOWED_ATTACHMENT_EXTENSIONS,
+  MAX_ATTACHMENT_SIZE_BYTES,
+  uploadAttachment,
+  validateAttachmentFile,
+} from '../domain/attachments';
 import { fmtUSD } from '../domain/selectors';
 import { useStore } from '../domain/store';
 import { useSession } from '../domain/session';
@@ -55,7 +61,10 @@ interface AttachmentRow {
   key: string;
   docType: DocType;
   file: File;
+  error?: string;
 }
+
+type UploadStatus = 'idle' | 'uploading' | 'partial-failure';
 
 interface RequestDraft {
   eventDate: string;
@@ -265,6 +274,9 @@ export function RequestFormPage() {
 
   const [docType, setDocType] = useState<DocType>('Bid Template');
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  const [uploadFailures, setUploadFailures] = useState<Array<{ name: string; message: string }>>([]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
@@ -424,11 +436,15 @@ export function RequestFormPage() {
   };
 
   const handleFileSelect = (files: FileList) => {
-    const added: AttachmentRow[] = Array.from(files).map((file) => ({
-      key: nextKey(),
-      docType,
-      file,
-    }));
+    const added: AttachmentRow[] = Array.from(files).map((file) => {
+      const issue = validateAttachmentFile(file);
+      return {
+        key: nextKey(),
+        docType,
+        file,
+        error: issue?.message,
+      };
+    });
     setAttachments((prev) => [...prev, ...added]);
   };
 
@@ -465,11 +481,60 @@ export function RequestFormPage() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const hasInvalidAttachment = attachments.some((a) => a.error);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    if (hasInvalidAttachment) {
+      setErrors((prev) => ({
+        ...prev,
+        attachments: 'Remove or replace invalid attachments before saving.',
+      }));
+      return;
+    }
 
-    addEvent(buildRequestEvent(currentRequestInput(), new Date().toISOString()));
+    const event = buildRequestEvent(currentRequestInput(), new Date().toISOString());
+
+    try {
+      await addEvent(event);
+    } catch (err) {
+      setErrors({ submit: err instanceof Error ? err.message : 'Failed to save event.' });
+      return;
+    }
+
+    const uploadable = attachments.filter((a) => !a.error);
+    let failures: Array<{ name: string; message: string }> = [];
+
+    if (uploadable.length > 0 && sessionUser?.id) {
+      setUploadStatus('uploading');
+      setUploadProgress({ done: 0, total: uploadable.length });
+      for (let i = 0; i < uploadable.length; i++) {
+        const row = uploadable[i];
+        try {
+          await uploadAttachment({
+            eventId: event.id,
+            docType: row.docType,
+            file: row.file,
+            uploaderId: sessionUser.id,
+          });
+        } catch (err) {
+          failures.push({
+            name: row.file.name,
+            message: err instanceof Error ? err.message : 'Upload failed.',
+          });
+        }
+        setUploadProgress({ done: i + 1, total: uploadable.length });
+      }
+      setUploadFailures(failures);
+      setUploadStatus(failures.length === 0 ? 'idle' : 'partial-failure');
+    }
+
+    if (failures.length > 0) {
+      // Event saved but some files failed — let the user decide what to do.
+      // Draft is preserved so the user can retry uploads or remove failed rows.
+      return;
+    }
 
     window.localStorage.removeItem(REQUEST_DRAFT_KEY);
     setDraftSavedAt(null);
@@ -879,7 +944,10 @@ export function RequestFormPage() {
           <Card>
             <FormSection title="Attachments" description="bid template, RFI questionnaire">
               <FieldGrid>
-                <FormField label="Document type">
+                <FormField
+                  label="Document type"
+                  hint={`Allowed: ${ALLOWED_ATTACHMENT_EXTENSIONS.join(', ')} (max ${Math.round(MAX_ATTACHMENT_SIZE_BYTES / 1024 / 1024)} MB)`}
+                >
                   <FilterSelect
                     value={docType}
                     onChange={(v) => setDocType(v as DocType)}
@@ -890,6 +958,53 @@ export function RequestFormPage() {
               </FieldGrid>
 
               <DropZone onFiles={handleFileSelect} />
+
+              {errors.attachments && (
+                <span style={{ fontSize: 12, color: theme.danger, fontWeight: 500 }} role="alert">
+                  {errors.attachments}
+                </span>
+              )}
+
+              {uploadStatus === 'uploading' && uploadProgress && (
+                <div
+                  role="status"
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: theme.radiusSm,
+                    background: theme.primaryMuted,
+                    color: theme.primary,
+                    fontSize: 12.5,
+                  }}
+                >
+                  Uploading attachments… {uploadProgress.done}/{uploadProgress.total}
+                </div>
+              )}
+
+              {uploadStatus === 'partial-failure' && uploadFailures.length > 0 && (
+                <div
+                  role="alert"
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: theme.radiusSm,
+                    background: `${theme.danger}14`,
+                    border: `1px solid ${theme.danger}40`,
+                    color: theme.danger,
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                    Event saved, but {uploadFailures.length} file
+                    {uploadFailures.length === 1 ? '' : 's'} did not upload:
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {uploadFailures.map((f) => (
+                      <li key={f.name}>
+                        {f.name}: {f.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {attachments.length > 0 && (
                 <ul
@@ -907,37 +1022,49 @@ export function RequestFormPage() {
                       key={a.key}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
+                        flexDirection: 'column',
+                        gap: 4,
                         padding: '8px 12px',
-                        background: theme.surfaceMuted,
+                        background: a.error ? `${theme.danger}10` : theme.surfaceMuted,
                         borderRadius: theme.radiusSm,
-                        border: `1px solid ${theme.border}`,
+                        border: `1px solid ${a.error ? `${theme.danger}50` : theme.border}`,
                         fontSize: 12.5,
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          fontFamily: theme.mono,
-                          color: theme.primary,
-                          background: theme.primaryMuted,
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                        }}
-                      >
-                        {a.docType}
-                      </span>
-                      <span style={{ color: theme.ink, fontWeight: 500, flex: 1, minWidth: 0 }}>{a.file.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeAttachment(a.key)}
-                        className="ui-btn ui-btn--ghost"
-                        style={{ height: 26, padding: '4px 8px', fontSize: 11 }}
-                      >
-                        Remove
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            fontFamily: theme.mono,
+                            color: theme.primary,
+                            background: theme.primaryMuted,
+                            padding: '2px 7px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {a.docType}
+                        </span>
+                        <span style={{ color: theme.ink, fontWeight: 500, flex: 1, minWidth: 0 }}>
+                          {a.file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(a.key)}
+                          className="ui-btn ui-btn--ghost"
+                          style={{ height: 26, padding: '4px 8px', fontSize: 11 }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {a.error && (
+                        <span
+                          role="alert"
+                          style={{ fontSize: 11.5, color: theme.danger, fontWeight: 600 }}
+                        >
+                          {a.error}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
