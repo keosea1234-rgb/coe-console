@@ -11,6 +11,7 @@ import {
   buildInsights,
   coverageMatrix,
   deepDive,
+  myRequestEvents,
   type DeepDive,
 } from '../domain/selectors';
 import { theme } from '../styles/theme';
@@ -30,6 +31,7 @@ import { SpendBaselineGrid } from '../components/console/SpendBaselineGrid';
 import { SubcategoryDeepDive } from '../components/console/SubcategoryDeepDive';
 import { WeeklyReports } from '../components/console/WeeklyReports';
 import { RequestInbox } from '../components/console/RequestInbox';
+import { MyRequests } from '../components/console/MyRequests';
 
 export function ConsolePage() {
   const { events, filters, baseline } = useStore();
@@ -42,6 +44,7 @@ export function ConsolePage() {
   // If a user lands on an admin-only tab (e.g., after sign-out/in), bounce them back.
   useEffect(() => {
     if (!isAdmin && (tab === 'spend' || tab === 'inbox')) setTab('exec');
+    if (isAdmin && tab === 'myRequests') setTab('exec');
   }, [isAdmin, tab]);
 
   const filtered = useMemo(() => applyFilters(events, filters), [events, filters]);
@@ -60,12 +63,19 @@ export function ConsolePage() {
       ).length,
     [events],
   );
+  const myRequests = useMemo(() => myRequestEvents(events, user), [events, user]);
 
   const openDive = (category: string) => setDive(deepDive(category, filtered, filters, baseline));
 
   return (
     <div className="app-shell">
-      <TopBar tab={tab} onTab={setTab} onReports={() => setReportsOpen(true)} pendingRequests={pendingRequests} />
+      <TopBar
+        tab={tab}
+        onTab={setTab}
+        onReports={() => setReportsOpen(true)}
+        pendingRequests={pendingRequests}
+        myRequests={myRequests.length}
+      />
       <FilterBar />
 
       <div className="app-content fade-up">
@@ -100,6 +110,8 @@ export function ConsolePage() {
         {tab === 'spend' && isAdmin && <SpendBaselineGrid />}
 
         {tab === 'inbox' && isAdmin && <RequestInbox events={events} />}
+
+        {tab === 'myRequests' && !isAdmin && <MyRequests events={events} user={user} />}
       </div>
 
       <SubcategoryDeepDive data={dive} onClose={() => setDive(null)} />

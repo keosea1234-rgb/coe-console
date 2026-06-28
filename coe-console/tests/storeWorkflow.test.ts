@@ -182,3 +182,29 @@ test('optimistic status update rolls back when repository mutation fails', async
   assert.equal(store.getState().events[0]?.status, 'Planned');
   assert.equal(store.getState().error, 'database unavailable');
 });
+
+test('addEvent rolls back and rejects when repository insert fails', async () => {
+  const { repository } = createMemoryRepository();
+  const created = requestEvent('EVT-FY26-0102');
+  const store = createConsoleStore({
+    repository: {
+      ...repository,
+      insertEvent: async () => {
+        throw new Error('insert failed');
+      },
+    },
+    getCurrentUser: () => ({ id: 'buyer-1', email: 'buyer@amcor.com' }),
+    now: () => '2026-06-28T12:00:00.000Z',
+  });
+
+  const originalConsoleError = console.error;
+  console.error = () => undefined;
+  try {
+    await assert.rejects(() => store.getState().addEvent(created), /insert failed/);
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  assert.equal(store.getState().events.some((event) => event.id === created.id), false);
+  assert.equal(store.getState().error, 'insert failed');
+});

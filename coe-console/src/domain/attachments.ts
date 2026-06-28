@@ -143,3 +143,39 @@ export async function listAttachmentsForEvent(eventId: string): Promise<Attachme
   if (error) throw error;
   return (data ?? []) as AttachmentRow[];
 }
+
+export async function listAttachmentsForEvents(
+  eventIds: string[],
+): Promise<Record<string, AttachmentRow[]>> {
+  if (eventIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('event_attachments')
+    .select('*')
+    .in('event_id', eventIds)
+    .order('uploaded_at', { ascending: false });
+
+  if (error) throw error;
+
+  const grouped: Record<string, AttachmentRow[]> = {};
+  for (const id of eventIds) grouped[id] = [];
+  for (const row of (data ?? []) as AttachmentRow[]) {
+    grouped[row.event_id] = grouped[row.event_id] ?? [];
+    grouped[row.event_id].push(row);
+  }
+  return grouped;
+}
+
+export async function createAttachmentDownloadUrl(
+  attachment: AttachmentRow,
+  expiresInSeconds = 600,
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(ATTACHMENT_BUCKET)
+    .createSignedUrl(attachment.storage_path, expiresInSeconds, {
+      download: attachment.file_name,
+    });
+
+  if (error) throw error;
+  return data.signedUrl;
+}

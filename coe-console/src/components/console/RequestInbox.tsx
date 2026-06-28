@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import type { FeedbackResponse, SourcingEvent } from '../../domain/types';
@@ -8,6 +8,11 @@ import { useStore } from '../../domain/store';
 import { Button, StatusBadge } from '../common/primitives';
 import { CATEGORY_BY_NAME } from '../../domain/categories';
 import { canEmailFeedback, openFeedbackEmail } from '../../lib/feedbackEmail';
+import {
+  createAttachmentDownloadUrl,
+  listAttachmentsForEvents,
+  type AttachmentRow,
+} from '../../domain/attachments';
 
 const th: React.CSSProperties = {
   textAlign: 'left',
@@ -48,6 +53,123 @@ function fmtReceivedAt(iso: string | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function fmtBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb >= 10 ? 0 : 1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
+}
+
+function AttachmentsCell({
+  attachments,
+  error,
+  downloadUrls,
+  downloadUrlError,
+  downloadingId,
+  onDownload,
+}: {
+  attachments?: AttachmentRow[];
+  error: string | null;
+  downloadUrls: Record<string, string>;
+  downloadUrlError: string | null;
+  downloadingId: string | null;
+  onDownload: (attachment: AttachmentRow) => void;
+}) {
+  if (error) {
+    return (
+      <span role="alert" style={{ fontSize: 11.5, color: theme.danger, whiteSpace: 'normal' }}>
+        Unable to load attachments
+      </span>
+    );
+  }
+
+  if (!attachments) {
+    return <span style={{ fontSize: 11.5, color: theme.textTertiary }}>Checking...</span>;
+  }
+
+  if (attachments.length === 0) {
+    return <span style={{ fontSize: 11.5, color: theme.textTertiary }}>None</span>;
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 5, minWidth: 190, maxWidth: 260 }}>
+      <span
+        style={{
+          width: 'fit-content',
+          fontSize: 10,
+          fontWeight: 800,
+          fontFamily: theme.mono,
+          padding: '2px 6px',
+          borderRadius: 4,
+          background: theme.primaryMuted,
+          color: theme.primary,
+        }}
+      >
+        {attachments.length} file{attachments.length === 1 ? '' : 's'}
+      </span>
+      {attachments.slice(0, 2).map((attachment) => (
+        <div key={attachment.id} style={{ display: 'grid', gap: 5, whiteSpace: 'normal' }}>
+          <div style={{ display: 'grid', gap: 1 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: theme.ink }}>
+              {attachment.file_name}
+            </span>
+            <span style={{ fontSize: 10.5, color: theme.textTertiary, fontFamily: theme.mono }}>
+              {attachment.doc_type} / {fmtBytes(Number(attachment.size_bytes))}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onDownload(attachment)}
+            disabled={downloadingId === attachment.id}
+            title={`Download ${attachment.file_name}`}
+            style={{
+              width: 'fit-content',
+              minHeight: 26,
+              border: `1px solid ${theme.borderStrong}`,
+              borderRadius: 6,
+              background: downloadUrls[attachment.id] ? theme.surface : theme.surfaceMuted,
+              color: theme.primary,
+              cursor: downloadingId === attachment.id ? 'wait' : 'pointer',
+              padding: '4px 9px',
+              fontSize: 11,
+              fontWeight: 800,
+              fontFamily: theme.mono,
+            }}
+          >
+            {downloadingId === attachment.id
+              ? 'Opening...'
+              : downloadUrls[attachment.id]
+                ? 'Download'
+                : 'Prepare download'}
+          </button>
+          {!downloadUrls[attachment.id] && downloadingId !== attachment.id && (
+            <span
+              style={{
+                fontSize: 10.5,
+                color: theme.textTertiary,
+                whiteSpace: 'normal',
+              }}
+            >
+              Link is still being prepared.
+            </span>
+          )}
+        </div>
+      ))}
+      {downloadUrlError && (
+        <span role="alert" style={{ fontSize: 10.5, color: theme.danger, whiteSpace: 'normal' }}>
+          {downloadUrlError}
+        </span>
+      )}
+      {attachments.length > 2 && (
+        <span style={{ fontSize: 10.5, color: theme.textTertiary }}>
+          +{attachments.length - 2} more
+        </span>
+      )}
+    </div>
+  );
 }
 
 function FeedbackCell({
@@ -113,6 +235,11 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const feedbackResponses = useStore((s) => s.feedbackResponses);
   const archiveEvent = useStore((s) => s.archiveEvent);
   const [filter, setFilter] = useState<'active' | 'new' | 'archived' | 'all'>('active');
+  const [attachmentsByEvent, setAttachmentsByEvent] = useState<Record<string, AttachmentRow[]>>({});
+  const [attachmentLoadError, setAttachmentLoadError] = useState<string | null>(null);
+  const [attachmentDownloadUrls, setAttachmentDownloadUrls] = useState<Record<string, string>>({});
+  const [downloadUrlError, setDownloadUrlError] = useState<string | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
 
   const requests = useMemo(
     () =>
@@ -134,6 +261,75 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const totalSpend = visible.reduce((sum, e) => sum + (e.addressable || 0), 0);
   const activeCount = requests.filter((e) => !e.archivedAt).length;
   const archivedCount = requests.length - activeCount;
+
+  useEffect(() => {
+    const eventIds = requests.map((event) => event.id);
+    let cancelled = false;
+
+    if (eventIds.length === 0) {
+      setAttachmentsByEvent({});
+      setAttachmentDownloadUrls({});
+      setAttachmentLoadError(null);
+      setDownloadUrlError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setAttachmentLoadError(null);
+    setDownloadUrlError(null);
+    void listAttachmentsForEvents(eventIds)
+      .then(async (grouped) => {
+        if (cancelled) return;
+        setAttachmentsByEvent(grouped);
+
+        const rows = Object.values(grouped).flat();
+        const nextUrls: Record<string, string> = {};
+        const failures: string[] = [];
+        await Promise.all(
+          rows.map(async (attachment) => {
+            try {
+              nextUrls[attachment.id] = await createAttachmentDownloadUrl(attachment);
+            } catch (err) {
+              console.error('[request-inbox] failed to prepare attachment link', err);
+              failures.push(attachment.file_name);
+            }
+          }),
+        );
+
+        if (!cancelled) {
+          setAttachmentDownloadUrls(nextUrls);
+          setDownloadUrlError(failures.length ? 'Download link unavailable.' : null);
+        }
+      })
+      .catch((err) => {
+        console.error('[request-inbox] failed to load attachments', err);
+        if (!cancelled) {
+          setAttachmentsByEvent({});
+          setAttachmentDownloadUrls({});
+          setAttachmentLoadError((err as Error).message);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requests]);
+
+  const downloadAttachment = async (attachment: AttachmentRow) => {
+    setDownloadUrlError(null);
+    setDownloadingAttachmentId(attachment.id);
+    try {
+      const url = attachmentDownloadUrls[attachment.id] ?? await createAttachmentDownloadUrl(attachment);
+      setAttachmentDownloadUrls((prev) => ({ ...prev, [attachment.id]: url }));
+      window.location.assign(url);
+    } catch (err) {
+      console.error('[request-inbox] failed to open attachment', err);
+      setDownloadUrlError(err instanceof Error ? err.message : 'Download link unavailable.');
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  };
 
   return (
     <Card pad={0}>
@@ -211,7 +407,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
       </div>
 
       <div style={{ overflowX: 'auto', maxHeight: 600 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1280 }}>
           <thead>
             <tr>
               <th style={th}>Received</th>
@@ -220,6 +416,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
               <th style={th}>Category</th>
               <th style={{ ...th, textAlign: 'right' }}>Addressable</th>
               <th style={th}>Status</th>
+              <th style={th}>Attachments</th>
               <th style={th}>Feedback</th>
               <th style={th}> </th>
             </tr>
@@ -227,7 +424,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ ...td, textAlign: 'center', color: theme.textTertiary, padding: 32 }}>
+                <td colSpan={9} style={{ ...td, textAlign: 'center', color: theme.textTertiary, padding: 32 }}>
                   No user requests received yet.
                 </td>
               </tr>
@@ -338,6 +535,16 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                           ))}
                         </select>
                       </div>
+                    </td>
+                    <td style={td}>
+                      <AttachmentsCell
+                        attachments={attachmentsByEvent[e.id]}
+                        error={attachmentLoadError}
+                        downloadUrls={attachmentDownloadUrls}
+                        downloadUrlError={downloadUrlError}
+                        downloadingId={downloadingAttachmentId}
+                        onDownload={(attachment) => void downloadAttachment(attachment)}
+                      />
                     </td>
                     <td style={td}>
                       <FeedbackCell

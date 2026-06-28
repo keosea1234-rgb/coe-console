@@ -39,6 +39,26 @@ export function applyFilters(events: SourcingEvent[], f: Filters): SourcingEvent
   });
 }
 
+export interface RequestOwner {
+  id: string;
+  email: string;
+}
+
+export function isUserRequest(event: SourcingEvent, user: RequestOwner | null | undefined): boolean {
+  if (!user || !event.requestCreatedAt) return false;
+  if (event.requestorId && event.requestorId === user.id) return true;
+  return !!event.requestor && event.requestor.toLowerCase() === user.email.toLowerCase();
+}
+
+export function myRequestEvents(
+  events: SourcingEvent[],
+  user: RequestOwner | null | undefined,
+): SourcingEvent[] {
+  return events
+    .filter((event) => isUserRequest(event, user))
+    .sort((a, b) => (b.requestCreatedAt ?? '').localeCompare(a.requestCreatedAt ?? ''));
+}
+
 function eventHasType(e: SourcingEvent, type: EventType): boolean {
   return (e.eventTypes ?? [e.type]).includes(type);
 }

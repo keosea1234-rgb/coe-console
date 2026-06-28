@@ -46,7 +46,8 @@ export function createServerStateSlice(
 
     addEvent: async (event) => {
       const requestorId = getCurrentUser()?.id ?? null;
-      set((state) => ({ events: [event, ...state.events] }));
+      const eventForState = requestorId ? { ...event, requestorId } : event;
+      set((state) => ({ events: [eventForState, ...state.events] }));
       try {
         await repository.insertEvent(event, requestorId);
       } catch (err) {
@@ -55,6 +56,7 @@ export function createServerStateSlice(
           events: state.events.filter((x) => x.id !== event.id),
           error: (err as Error).message,
         }));
+        throw err;
       }
     },
 

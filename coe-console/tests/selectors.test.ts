@@ -5,6 +5,7 @@ import {
   baselineKey,
   computeTotals,
   coverageByCategory,
+  myRequestEvents,
   pipelineByStatus,
   regionPerformance,
   savingsTrend,
@@ -148,4 +149,35 @@ test('pipeline and savings trend keep operational buckets stable', () => {
   const trend = savingsTrend(events);
   assert.equal(trend.find((point) => point.label === 'FY26 Q1')?.savings, 40);
   assert.equal(trend.find((point) => point.label === 'FY26 Q3')?.savings, 15);
+});
+
+test('myRequestEvents returns only the signed-in users submitted requests', () => {
+  const mineById = event({
+    id: 'EVT-FY26-0101',
+    requestorId: 'buyer-1',
+    requestor: 'someone-else@amcor.com',
+    requestCreatedAt: '2026-06-28T11:00:00.000Z',
+  });
+  const mineByEmail = event({
+    id: 'EVT-FY26-0102',
+    requestor: 'BUYER@AMCOR.COM',
+    requestCreatedAt: '2026-06-28T12:00:00.000Z',
+  });
+  const otherRequest = event({
+    id: 'EVT-FY26-0103',
+    requestorId: 'other-1',
+    requestor: 'other@amcor.com',
+    requestCreatedAt: '2026-06-28T13:00:00.000Z',
+  });
+  const seededEvent = event({
+    id: 'EVT-FY26-0104',
+    requestor: 'buyer@amcor.com',
+  });
+
+  const mine = myRequestEvents(
+    [mineById, mineByEmail, otherRequest, seededEvent],
+    { id: 'buyer-1', email: 'buyer@amcor.com' },
+  );
+
+  assert.deepEqual(mine.map((item) => item.id), ['EVT-FY26-0102', 'EVT-FY26-0101']);
 });

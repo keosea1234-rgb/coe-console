@@ -25,6 +25,7 @@ export interface SourcingEvent {
   savings: number; // $ realized savings (0 unless Completed)
   startDate: string; // ISO date
   requestor?: string;
+  requestorId?: string;
   shouldCostModeling?: boolean;
   riskAssessment?: boolean;
   esgAssessment?: boolean;

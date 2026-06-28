@@ -4,18 +4,20 @@ import { SegmentedControl } from '../common/primitives';
 import { IconReport } from './icons';
 import { useSession } from '../../domain/session';
 
-export type ConsoleTab = 'exec' | 'ops' | 'spend' | 'inbox';
+export type ConsoleTab = 'exec' | 'ops' | 'myRequests' | 'spend' | 'inbox';
 
 export function TopBar({
   tab,
   onTab,
   onReports,
   pendingRequests = 0,
+  myRequests = 0,
 }: {
   tab: ConsoleTab;
   onTab: (t: ConsoleTab) => void;
   onReports: () => void;
   pendingRequests?: number;
+  myRequests?: number;
 }) {
   const user = useSession((s) => s.user);
   const logout = useSession((s) => s.logout);
@@ -25,6 +27,14 @@ export function TopBar({
     { value: 'exec', label: 'Exec overview' },
     { value: 'ops', label: 'Operational console' },
   ];
+  const userTabs: { value: ConsoleTab; label: string }[] = !isAdmin
+    ? [
+        {
+          value: 'myRequests',
+          label: myRequests > 0 ? `My requests (${myRequests})` : 'My requests',
+        },
+      ]
+    : [];
   const adminTabs: { value: ConsoleTab; label: string }[] = isAdmin
     ? [
         { value: 'spend', label: 'Spend data' },
@@ -34,7 +44,7 @@ export function TopBar({
         },
       ]
     : [];
-  const tabs = [...baseTabs, ...adminTabs];
+  const tabs = [...baseTabs, ...userTabs, ...adminTabs];
 
   return (
     <header className="sticky-header" style={{ height: theme.headerH }}>

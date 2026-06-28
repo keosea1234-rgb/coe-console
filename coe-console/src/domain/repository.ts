@@ -39,6 +39,7 @@ export function rowToEvent(r: LegacySourcingEventRow): SourcingEvent {
     savings: num(r.savings),
     startDate: r.start_date,
     requestor: r.requestor ?? undefined,
+    requestorId: r.requestor_id ?? undefined,
     shouldCostModeling: r.should_cost_modeling ?? undefined,
     riskAssessment: r.risk_assessment ?? undefined,
     esgAssessment: r.esg_assessment ?? undefined,
