@@ -736,21 +736,21 @@ select:disabled {
 
 .cov-cell {
   position: relative;
-  min-height: 50px;
+  min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1px;
   padding: 8px 8px 13px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-family: var(--font-number);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "zero" 1;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%), var(--cell);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 64%), var(--cell);
   color: var(--cell-fg);
   border: 1px solid var(--cell-bd);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: transform var(--transition-medium) var(--easing), box-shadow var(--transition-medium) var(--easing);
 }
 .cov-cell:hover {

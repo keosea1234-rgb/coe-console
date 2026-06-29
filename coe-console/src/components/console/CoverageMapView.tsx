@@ -5,6 +5,7 @@ import { fmtPct, fmtUSD } from '../../domain/selectors';
 import { numeric, sectionLabel, theme } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import { ProgressBar } from '../common/primitives';
+import { COVERAGE_RAMP } from './coverageColors';
 import {
   REGION_ANCHORS,
   WORLD_COUNTRIES,
@@ -15,16 +16,10 @@ import {
   projectLng,
 } from '../../domain/worldGeo';
 
-// Sequential brand ramp: pale → navy as coverage rises. A single-hue
-// choropleth reads as "premium analytics" far better than traffic-light buckets.
-// The palest stop is still clearly bluer than the ocean so low-coverage land
-// never washes out against the water.
+// Coverage ramp mirrors the matrix format: low values read warm, high values
+// move into green.
 const RAMP: [number, string][] = [
-  [0, '#cddef6'],
-  [0.35, '#92b5ee'],
-  [0.6, '#5a87de'],
-  [0.8, '#345fc6'],
-  [1, '#1e3a8a'],
+  ...COVERAGE_RAMP,
 ];
 const NO_DATA = '#c7d2e3';
 const NEUTRAL_LAND = '#d3ddec'; // land outside the four coverage regions
