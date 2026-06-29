@@ -48,7 +48,7 @@ export function RegionPerformance({ rows }: { rows: RegionPerf[] }) {
                 fontSize: 17,
                 fontWeight: 800,
                 fontFamily: theme.mono,
-                letterSpacing: '-0.02em',
+                letterSpacing: 0,
                 fontVariantNumeric: 'tabular-nums',
                 color: theme.ink,
               }}

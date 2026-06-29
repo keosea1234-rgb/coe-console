@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { FY, Region, Status } from './constants';
 import type { Database } from './database.types';
+import { generateEvents } from './generateEvents';
 import { baselineKey, type SpendBaseline } from './selectors';
 import type { FeedbackResponse, SourcingEvent } from './types';
 
@@ -100,7 +101,8 @@ export async function listEvents(): Promise<SourcingEvent[]> {
     .select('*')
     .order('start_date', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(rowToEvent);
+  const events = (data ?? []).map(rowToEvent);
+  return events.length ? events : generateEvents();
 }
 
 export async function insertEvent(e: SourcingEvent, requestorId: string | null) {

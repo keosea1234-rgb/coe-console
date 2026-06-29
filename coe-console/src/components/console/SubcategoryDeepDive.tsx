@@ -40,7 +40,7 @@ function Tile({ label, value, accent }: { label: string; value: string; accent?:
           fontWeight: 800,
           fontFamily: theme.mono,
           color: accent ?? theme.ink,
-          letterSpacing: '-0.02em',
+          letterSpacing: 0,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
@@ -78,7 +78,7 @@ function Body({ data, onClose }: { data: DeepDive; onClose: () => void }) {
               style={{
                 fontSize: 20,
                 fontWeight: 800,
-                letterSpacing: '-0.02em',
+                letterSpacing: 0,
                 marginTop: 4,
                 color: theme.ink,
                 lineHeight: 1.25,

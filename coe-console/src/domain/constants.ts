@@ -72,18 +72,18 @@ export const STATUS_COLORS: Record<Status, { fg: string; bg: string }> = {
 // Console palette (single source of design tokens consumed by theme.ts).
 // ---------------------------------------------------------------------------
 export const PALETTE = {
-  appBg: '#edf2fc',
+  appBg: '#e9eff8',
   surface: '#ffffff',
-  surfaceRaised: '#f7faff',
-  surfaceMuted: '#eef3fb',
-  border: '#d0d9ed',
-  borderStrong: '#b8c6de',
+  surfaceRaised: '#f8fbff',
+  surfaceMuted: '#e8eef8',
+  border: '#b8c8df',
+  borderStrong: '#8fa4c2',
   borderFocus: '#2563eb',
   radius: 10,
   radiusSm: 8,
-  shadow: '0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.05)',
-  shadowRaised: '0 4px 14px rgba(15,23,42,.07), 0 1px 3px rgba(15,23,42,.04)',
-  shadowFocus: '0 0 0 3px rgba(37,99,235,.18)',
+  shadow: '0 1px 2px rgba(15,23,42,.07), 0 8px 24px rgba(15,23,42,.055)',
+  shadowRaised: '0 14px 34px rgba(15,23,42,.12), 0 3px 8px rgba(15,23,42,.07)',
+  shadowFocus: '0 0 0 3px rgba(37,99,235,.22)',
 
   primary: '#1e3a8a',
   primaryHover: '#1a3278',
@@ -96,7 +96,7 @@ export const PALETTE = {
   ink: '#0f172a',
 
   textSecondary: '#475569',
-  textTertiary: '#94a3b8',
+  textTertiary: '#71839b',
 
   muted: '#64748b',
   muted2: '#94a3b8',

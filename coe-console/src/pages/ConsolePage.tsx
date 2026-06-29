@@ -10,10 +10,12 @@ import {
   savingsTrend,
   buildInsights,
   coverageMatrix,
+  regionCoverageDetail,
   deepDive,
   myRequestEvents,
   type DeepDive,
 } from '../domain/selectors';
+import { REGIONS } from '../domain/constants';
 import { theme } from '../styles/theme';
 
 import { TopBar, type ConsoleTab } from '../components/console/TopBar';
@@ -27,6 +29,7 @@ import { PipelineFunnel } from '../components/console/PipelineFunnel';
 import { EventTimeline } from '../components/console/EventTimeline';
 import { EventRegisterTable } from '../components/console/EventRegisterTable';
 import { CoverageMatrix } from '../components/console/CoverageMatrix';
+import { CoverageMapView } from '../components/console/CoverageMapView';
 import { SpendBaselineGrid } from '../components/console/SpendBaselineGrid';
 import { SubcategoryDeepDive } from '../components/console/SubcategoryDeepDive';
 import { WeeklyReports } from '../components/console/WeeklyReports';
@@ -55,6 +58,14 @@ export function ConsolePage() {
   const trend = useMemo(() => savingsTrend(filtered), [filtered]);
   const insights = useMemo(() => buildInsights(filtered, filters, baseline), [filtered, filters, baseline]);
   const matrix = useMemo(() => coverageMatrix(filtered, filters, baseline), [filtered, filters, baseline]);
+  const mapRegionDetails = useMemo(
+    () => REGIONS.map((region) => regionCoverageDetail(filtered, filters, baseline, region)),
+    [filtered, filters, baseline],
+  );
+  const activeMapRegions = useMemo(
+    () => (filters.regions.length ? filters.regions : REGIONS),
+    [filters.regions],
+  );
 
   const pendingRequests = useMemo(
     () =>
@@ -79,8 +90,12 @@ export function ConsolePage() {
       <FilterBar />
 
       <div className="app-content fade-up">
-        <KpiRow totals={totals} />
-        <InsightsStrip insights={insights} />
+        {tab !== 'coverageMap' && (
+          <>
+            <KpiRow totals={totals} />
+            <InsightsStrip insights={insights} />
+          </>
+        )}
 
         {tab === 'exec' && (
           <>
@@ -92,6 +107,13 @@ export function ConsolePage() {
               </div>
             </div>
             <RegionPerformance rows={regionPerf} />
+            <CoverageMatrix rows={matrix} onSelect={openDive} />
+          </>
+        )}
+
+        {tab === 'coverageMap' && (
+          <>
+            <CoverageMapView regions={mapRegionDetails} activeRegions={activeMapRegions} />
             <CoverageMatrix rows={matrix} onSelect={openDive} />
           </>
         )}

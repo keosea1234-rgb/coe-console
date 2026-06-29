@@ -50,7 +50,7 @@ export function KpiCard({
     <div
       style={{
         ...card,
-        padding: '16px 18px',
+        padding: '17px 19px',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
@@ -60,11 +60,12 @@ export function KpiCard({
       <div style={sectionLabel}>{label}</div>
       <div
         style={{
-          fontSize: 24,
-          fontWeight: 800,
-          letterSpacing: '-0.02em',
+          fontSize: 25,
+          fontWeight: 780,
+          letterSpacing: 0,
           color: accent ?? theme.ink,
           lineHeight: 1.15,
+          fontFamily: theme.display,
           ...numeric,
         }}
       >
@@ -96,10 +97,11 @@ export function SegmentedControl<T extends string>({
         display: 'inline-flex',
         width: fullWidth ? '100%' : undefined,
         background: theme.surfaceMuted,
-        border: `1px solid ${theme.border}`,
+        border: `1px solid ${theme.borderStrong}`,
         borderRadius: theme.radiusSm,
         padding: 3,
         gap: 2,
+        boxShadow: 'inset 0 1px 1px rgba(15,23,42,.04)',
       }}
     >
       {options.map((o) => {
@@ -116,10 +118,10 @@ export function SegmentedControl<T extends string>({
               borderRadius: 6,
               padding: '6px 12px',
               fontSize: 12.5,
-              fontWeight: 600,
+              fontWeight: 680,
               background: active ? theme.surface : 'transparent',
               color: active ? theme.ink : theme.textSecondary,
-              boxShadow: active ? '0 1px 2px rgba(15,23,42,.06)' : 'none',
+              boxShadow: active ? '0 1px 2px rgba(15,23,42,.09), 0 5px 12px rgba(15,23,42,.06)' : 'none',
               transition: `all ${theme.transitionFast} ${theme.easing}`,
               cursor: 'pointer',
             }}

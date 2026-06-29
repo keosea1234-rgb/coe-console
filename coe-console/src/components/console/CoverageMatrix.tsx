@@ -1,33 +1,59 @@
-import { theme } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
-import { REGIONS, type Region } from '../../domain/constants';
+import { REGIONS, REGION_LABEL, type Region } from '../../domain/constants';
 import type { MatrixCell } from '../../domain/selectors';
 import { fmtUSD, fmtPct } from '../../domain/selectors';
 
-const th: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '.06em',
-  textTransform: 'uppercase',
-  color: theme.textTertiary,
-  fontFamily: theme.mono,
-  padding: '8px 8px',
-};
+// Sequential brand scale (pale blue -> deep indigo) — replaces the old teal ramp
+// so the heatmap reads as part of the console's blue/indigo identity.
+const SCALE: [number, [number, number, number]][] = [
+  [0.0, [234, 241, 252]], // #EAF1FC
+  [0.3, [179, 206, 246]], // #B3CEF6
+  [0.55, [108, 152, 235]], // #6C98EB
+  [0.78, [55, 96, 196]], // #3760C4
+  [1.0, [30, 58, 138]], // #1E3A8A (brand primary)
+];
 
-function cellStyle(coverage: number): React.CSSProperties {
-  const alpha = 0.05 + Math.min(1, coverage) * 0.55;
-  const dark = coverage > 0.5;
-  return {
-    background: `rgba(15,118,110,${alpha.toFixed(3)})`,
-    color: dark ? '#fff' : theme.muted5,
-    borderRadius: 6,
-    padding: '8px 6px',
-    textAlign: 'center',
-    fontFamily: theme.mono,
-    lineHeight: 1.25,
-    transition: `transform ${theme.transitionFast} ${theme.easing}`,
-    cursor: 'default',
+const legendGradient = `linear-gradient(90deg, ${SCALE.map(
+  ([t, c]) => `rgb(${c[0]},${c[1]},${c[2]}) ${Math.round(t * 100)}%`,
+).join(', ')})`;
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+function scaleColor(t: number): [number, number, number] {
+  const x = Math.max(0, Math.min(1, t));
+  for (let i = 1; i < SCALE.length; i++) {
+    const [t1, c1] = SCALE[i];
+    const [t0, c0] = SCALE[i - 1];
+    if (x <= t1) {
+      const k = (x - t0) / (t1 - t0);
+      return [lerp(c0[0], c1[0], k), lerp(c0[1], c1[1], k), lerp(c0[2], c1[2], k)];
+    }
+  }
+  return SCALE[SCALE.length - 1][1];
+}
+
+// WCAG relative luminance — drives the white/navy text switch per cell.
+function luminance([r, g, b]: [number, number, number]): number {
+  const f = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
   };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function cellVars(coverage: number): React.CSSProperties {
+  const [r, g, b] = scaleColor(coverage).map(Math.round) as [number, number, number];
+  const dark = luminance([r, g, b]) < 0.5;
+  const vars: Record<string, string> = {
+    '--cell': `rgb(${r},${g},${b})`,
+    '--cell-fg': dark ? '#ffffff' : '#15294f',
+    '--cell-fg2': dark ? 'rgba(255,255,255,.82)' : 'rgba(21,41,79,.62)',
+    '--cell-bd': dark ? 'rgba(255,255,255,.14)' : 'rgba(15,23,42,.08)',
+    '--cell-track': dark ? 'rgba(255,255,255,.22)' : 'rgba(15,23,42,.10)',
+    '--cell-fill': dark ? 'rgba(255,255,255,.9)' : '#2563eb',
+    '--cov': `${Math.round(Math.min(1, coverage) * 100)}%`,
+  };
+  return vars as React.CSSProperties;
 }
 
 export function CoverageMatrix({
@@ -39,18 +65,24 @@ export function CoverageMatrix({
 }) {
   return (
     <Card pad={0}>
-      <div style={{ padding: '16px 18px 10px' }}>
-        <CardTitle sub="Coverage intensity - click a category for the deep-dive">
-          Category x Region coverage matrix
+      <div className="cov-matrix-head">
+        <CardTitle sub="Coverage intensity by region · click a category to open the deep-dive">
+          Category × Region coverage matrix
         </CardTitle>
+        <div className="cov-legend" aria-hidden="true">
+          <span className="cov-legend-cap">Low</span>
+          <span className="cov-legend-grad" style={{ background: legendGradient }} />
+          <span className="cov-legend-cap">High</span>
+        </div>
       </div>
-      <div style={{ overflowX: 'auto', padding: '0 14px 16px' }}>
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '3px', minWidth: 540 }}>
+
+      <div className="cov-matrix-scroll">
+        <table className="cov-table">
           <thead>
             <tr>
-              <th style={{ ...th, textAlign: 'left', minWidth: 150 }}>Category</th>
+              <th className="cov-th cov-th--cat">Category</th>
               {REGIONS.map((r) => (
-                <th key={r} style={th}>
+                <th key={r} className="cov-th" title={REGION_LABEL[r]}>
                   {r}
                 </th>
               ))}
@@ -58,56 +90,50 @@ export function CoverageMatrix({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.category}>
+              <tr key={row.category} className="cov-row">
                 <td>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(row.category)}
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: theme.ink,
-                      padding: '4px 2px',
-                      textAlign: 'left',
-                      borderRadius: 4,
-                      transition: `color ${theme.transitionFast} ${theme.easing}`,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = theme.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = theme.ink;
-                    }}
-                  >
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: row.color, flexShrink: 0 }} />
-                    {row.category}
+                  <button type="button" className="cov-row-btn" onClick={() => onSelect(row.category)}>
+                    <span className="cov-dot" style={{ background: row.color }} />
+                    <span className="cov-row-name">{row.category}</span>
+                    <svg
+                      className="cov-chevron"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="9 6 15 12 9 18" />
+                    </svg>
                   </button>
                 </td>
                 {REGIONS.map((r) => {
                   const cell = row.cells[r];
+                  if (cell.addressable === 0 && cell.sourced === 0) {
+                    return (
+                      <td key={r}>
+                        <div className="cov-cell cov-cell--empty" title="No baseline">
+                          —
+                        </div>
+                      </td>
+                    );
+                  }
                   return (
                     <td key={r}>
                       <div
-                        style={cellStyle(cell.coverage)}
-                        title={`${fmtUSD(cell.sourced)} sourced`}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'scale(1.03)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }}
+                        className="cov-cell"
+                        style={cellVars(cell.coverage)}
+                        title={`${fmtUSD(cell.sourced)} sourced of ${fmtUSD(cell.addressable)}`}
                       >
-                        <div style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                          {fmtPct(cell.coverage)}
-                        </div>
-                        <div style={{ fontSize: 9, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
-                          {fmtUSD(cell.sourced)}
-                        </div>
+                        <span className="cov-cell-pct">{fmtPct(cell.coverage)}</span>
+                        <span className="cov-cell-usd">{fmtUSD(cell.sourced)}</span>
+                        <span className="cov-cell-bar">
+                          <i />
+                        </span>
                       </div>
                     </td>
                   );

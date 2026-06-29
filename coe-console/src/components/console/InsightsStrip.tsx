@@ -71,7 +71,7 @@ function InsightCard({
         style={{
           fontSize: 16,
           fontWeight: 700,
-          letterSpacing: '-0.01em',
+          letterSpacing: 0,
           lineHeight: 1.3,
           color: theme.ink,
         }}

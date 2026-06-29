@@ -76,6 +76,20 @@ function sourcedForRegion(e: SourcingEvent, region: Region): number {
   return e.region === region ? e.sourced : 0;
 }
 
+function addressableForRegion(e: SourcingEvent, region: Region): number {
+  if (e.businessGroups) {
+    return e.businessGroups.find((g) => g.region === region)?.addressable ?? 0;
+  }
+  return e.region === region ? e.addressable : 0;
+}
+
+function savingsForRegion(e: SourcingEvent, region: Region): number {
+  const sourced = sourcedForRegion(e, region);
+  if (e.sourced > 0) return e.savings * (sourced / e.sourced);
+  const addressable = addressableForRegion(e, region);
+  return e.addressable > 0 ? e.savings * (addressable / e.addressable) : 0;
+}
+
 // --- Spend baseline (editable scope) -------------------------------------
 // key = `${fy}|${category}|${region}`
 export type SpendBaseline = Record<string, number>;
@@ -339,6 +353,126 @@ export function coverageMatrix(
     }
     return { category: cat.name, color: cat.color, cells };
   });
+}
+
+// --- Region coverage detail ----------------------------------------------
+export interface RegionSubcategoryCoverage {
+  subcategory: string;
+  addressable: number;
+  sourced: number;
+  savings: number;
+  coverage: number;
+  untapped: number;
+  events: number;
+}
+
+export interface RegionCategoryCoverage {
+  category: string;
+  color: string;
+  addressable: number;
+  sourced: number;
+  savings: number;
+  coverage: number;
+  untapped: number;
+  events: number;
+  subcategories: RegionSubcategoryCoverage[];
+}
+
+export interface RegionCoverageDetail {
+  region: Region;
+  addressable: number;
+  sourced: number;
+  savings: number;
+  coverage: number;
+  untapped: number;
+  events: number;
+  activeCategories: number;
+  activeSubcategories: number;
+  topGapCategory: string;
+  topGapSubcategory: string;
+  scope: string;
+  categoryRows: RegionCategoryCoverage[];
+}
+
+export function regionCoverageDetail(
+  filtered: SourcingEvent[],
+  f: Filters,
+  baseline: SpendBaseline,
+  region: Region,
+): RegionCoverageDetail {
+  const fys = fyScope(f);
+  const scopedCategories = new Set(categoryScope(f));
+  const scopedSubcategories = new Set(f.subcategories);
+  const regionEvents = filtered.filter((e) => eventRegions(e).includes(region));
+
+  const categoryRows = CATEGORIES.filter((cat) => scopedCategories.has(cat.name)).map((cat) => {
+    const catEvents = regionEvents.filter((e) => e.category === cat.name);
+    const weights = subWeights(cat);
+    const subcategories = cat.subcategories
+      .map((sub, index) => ({ sub, index }))
+      .filter(({ sub }) => !f.subcategories.length || scopedSubcategories.has(sub))
+      .map(({ sub, index }) => {
+        const subEvents = catEvents.filter((e) => e.subcategory === sub);
+        const sourced = sum(subEvents, (e) => sourcedForRegion(e, region));
+        const savings = sum(subEvents, (e) => savingsForRegion(e, region));
+        const addressable = f.subcategories.length
+          ? sum(subEvents, (e) => addressableForRegion(e, region))
+          : sum(fys, (fy) => cellAddressable(fy, cat.name, region, baseline)) * weights[index];
+        return {
+          subcategory: sub,
+          addressable,
+          sourced,
+          savings,
+          coverage: addressable > 0 ? Math.min(1, sourced / addressable) : 0,
+          untapped: Math.max(0, addressable - sourced),
+          events: subEvents.length,
+        };
+      })
+      .sort((a, b) => b.untapped - a.untapped);
+
+    const sourced = sum(catEvents, (e) => sourcedForRegion(e, region));
+    const savings = sum(catEvents, (e) => savingsForRegion(e, region));
+    const addressable = f.subcategories.length
+      ? sum(catEvents, (e) => addressableForRegion(e, region))
+      : sum(fys, (fy) => cellAddressable(fy, cat.name, region, baseline));
+
+    return {
+      category: cat.name,
+      color: cat.color,
+      addressable,
+      sourced,
+      savings,
+      coverage: addressable > 0 ? Math.min(1, sourced / addressable) : 0,
+      untapped: Math.max(0, addressable - sourced),
+      events: catEvents.length,
+      subcategories,
+    };
+  });
+
+  categoryRows.sort((a, b) => b.untapped - a.untapped);
+  const topCategory = categoryRows[0];
+  const topSubcategory = [...categoryRows.flatMap((row) => row.subcategories)].sort(
+    (a, b) => b.untapped - a.untapped,
+  )[0];
+  const addressable = sum(categoryRows, (row) => row.addressable);
+  const sourced = sum(categoryRows, (row) => row.sourced);
+  const savings = sum(categoryRows, (row) => row.savings);
+
+  return {
+    region,
+    addressable,
+    sourced,
+    savings,
+    coverage: addressable > 0 ? Math.min(1, sourced / addressable) : 0,
+    untapped: Math.max(0, addressable - sourced),
+    events: regionEvents.length,
+    activeCategories: categoryRows.filter((row) => row.sourced > 0 || row.addressable > 0).length,
+    activeSubcategories: categoryRows.flatMap((row) => row.subcategories).filter((row) => row.sourced > 0).length,
+    topGapCategory: topCategory?.category ?? '-',
+    topGapSubcategory: topSubcategory?.subcategory ?? '-',
+    scope: `${fys.join(', ')} - ${f.categories.length ? f.categories.join(', ') : 'All categories'}`,
+    categoryRows,
+  };
 }
 
 // --- Subcategory deep-dive ------------------------------------------------

@@ -7,6 +7,7 @@ import {
   coverageByCategory,
   myRequestEvents,
   pipelineByStatus,
+  regionCoverageDetail,
   regionPerformance,
   savingsTrend,
   type Filters,
@@ -136,6 +137,27 @@ test('coverage and region performance attribute multi-region sourced spend corre
   const regions = regionPerformance(filtered, filters, baseline);
   assert.equal(regions.find((row) => row.region === 'EMEA')?.sourced, 300);
   assert.equal(regions.find((row) => row.region === 'APAC')?.sourced, 200);
+});
+
+test('region coverage detail breaks down category and subcategory spend by selected region', () => {
+  const filters: Filters = {
+    ...emptyFilters,
+    fys: ['FY26'],
+    regions: ['NA', 'EMEA', 'APAC'],
+    categories: ['Resins'],
+  };
+  const filtered = applyFilters(events, filters);
+
+  const detail = regionCoverageDetail(filtered, filters, baseline, 'EMEA');
+  const resins = detail.categoryRows.find((row) => row.category === 'Resins');
+  const pp = resins?.subcategories.find((row) => row.subcategory === 'PP');
+
+  assert.equal(detail.sourced, 300);
+  assert.equal(detail.addressable, 900);
+  assert.equal(detail.coverage, 300 / 900);
+  assert.equal(resins?.sourced, 300);
+  assert.equal(pp?.sourced, 300);
+  assert.equal(pp?.events, 1);
 });
 
 test('pipeline and savings trend keep operational buckets stable', () => {

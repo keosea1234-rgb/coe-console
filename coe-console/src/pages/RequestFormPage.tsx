@@ -591,7 +591,7 @@ export function RequestFormPage() {
               margin: 0,
               fontSize: 28,
               fontWeight: 850,
-              letterSpacing: '-0.02em',
+              letterSpacing: 0,
               color: theme.ink,
               lineHeight: 1.15,
             }}

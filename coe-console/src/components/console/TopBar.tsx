@@ -4,7 +4,7 @@ import { SegmentedControl } from '../common/primitives';
 import { IconReport } from './icons';
 import { useSession } from '../../domain/session';
 
-export type ConsoleTab = 'exec' | 'ops' | 'myRequests' | 'spend' | 'inbox';
+export type ConsoleTab = 'exec' | 'coverageMap' | 'ops' | 'myRequests' | 'spend' | 'inbox';
 
 export function TopBar({
   tab,
@@ -25,6 +25,7 @@ export function TopBar({
 
   const baseTabs: { value: ConsoleTab; label: string }[] = [
     { value: 'exec', label: 'Exec overview' },
+    { value: 'coverageMap', label: 'Coverage map' },
     { value: 'ops', label: 'Operational console' },
   ];
   const userTabs: { value: ConsoleTab; label: string }[] = !isAdmin
@@ -79,7 +80,7 @@ export function TopBar({
             e
           </div>
           <div style={{ lineHeight: 1.25 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', color: theme.ink }}>
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0, color: theme.ink }}>
               eSourcing CoE
             </div>
             <div style={{ fontSize: 11, color: theme.textSecondary, fontWeight: 500 }}>

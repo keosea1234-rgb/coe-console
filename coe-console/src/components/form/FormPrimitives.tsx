@@ -155,7 +155,7 @@ export function FormSection({
               margin: 0,
               fontSize: 14.5,
               fontWeight: 700,
-              letterSpacing: '-0.01em',
+              letterSpacing: 0,
               color: theme.ink,
               lineHeight: 1.35,
             }}
