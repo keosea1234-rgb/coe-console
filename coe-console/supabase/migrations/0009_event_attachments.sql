@@ -94,13 +94,35 @@ create policy "event_attachments_read_authenticated"
   to authenticated
   using (true);
 
--- Insert: the caller must stamp themselves as uploaded_by. Storage policy
--- gates the binary upload; this gates the metadata row.
+-- Insert: the caller must stamp themselves as uploaded_by, point at an object
+-- they uploaded, and attach only to an event they own. Admins may attach to
+-- any event, but still must attach their own uploaded object.
 drop policy if exists "event_attachments_insert_self" on public.event_attachments;
 create policy "event_attachments_insert_self"
   on public.event_attachments for insert
   to authenticated
-  with check (uploaded_by = auth.uid());
+  with check (
+    uploaded_by = auth.uid()
+    and exists (
+      select 1
+      from storage.objects o
+      where o.bucket_id = 'request-attachments'
+        and o.name = storage_path
+        and o.owner = auth.uid()
+    )
+    and exists (
+      select 1
+      from public.sourcing_events e
+      where e.id = event_id
+        and (
+          public.is_admin()
+          or (
+            e.requestor_id = auth.uid()
+            and e.request_created_at is not null
+          )
+        )
+    )
+  );
 
 -- Delete: admins, or the uploader.
 drop policy if exists "event_attachments_delete_admin_or_owner" on public.event_attachments;

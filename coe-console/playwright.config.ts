@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
 
 // We run the production preview server, not the dev server. The preview server
 // is faster to spin up and matches what ships, so e2e exercises the same

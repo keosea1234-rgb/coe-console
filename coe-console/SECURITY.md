@@ -15,11 +15,12 @@ database, not only in React route guards.
   headers.
 - The service role key is local-only for seeding and must never be exposed to
   Vite or Vercel client environments.
+- Production auth model is admin-created or invited Supabase users. Public
+  signup is hidden unless `VITE_AUTH_SIGNUP_ENABLED=true` is set intentionally.
+- Attachment metadata inserts require an owned storage object and an event the
+  caller is allowed to attach to.
 
 ## Sprint 1 follow-ups
 
-- Add automated RLS integration tests before broad production rollout.
-- Decide whether signup should be invite-only or restricted to approved email
-  domains.
 - Add dependency and secret scanning in CI.
 - Define audit retention and export requirements with the business owner.

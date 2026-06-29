@@ -125,5 +125,10 @@ Variables** for Production, Preview, and Development:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
+Optional:
+
+- `VITE_AUTH_SIGNUP_ENABLED=true` exposes public signup. Leave unset or `false`
+  for production admin-created/invited users.
+
 `SUPABASE_SERVICE_ROLE_KEY` is local-only for `npm run seed`. Never add it to
 Vercel or commit it to the repo.

@@ -16,6 +16,7 @@
 // has something to assert against.
 
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -38,6 +39,55 @@ async function clientAs(email: string, password: string): Promise<SupabaseClient
   const { error } = await c.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`signIn failed for ${email}: ${error.message}`);
   return c;
+}
+
+async function currentUser(client: SupabaseClient): Promise<{ id: string; email: string }> {
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user?.email) {
+    throw new Error(`Unable to load signed-in user: ${error?.message ?? 'missing user'}`);
+  }
+  return { id: data.user.id, email: data.user.email };
+}
+
+function uniqueEventId(prefix: string) {
+  return `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}`;
+}
+
+async function insertOwnRequestEvent(client: SupabaseClient, user: { id: string; email: string }) {
+  const eventId = uniqueEventId('RLS-ATTACH');
+  const { error } = await client.from('sourcing_events').insert({
+    id: eventId,
+    name: 'RLS attachment policy test',
+    fy: 'FY26',
+    category: 'Resins',
+    subcategory: 'PE',
+    region: 'NA',
+    regions: ['NA'],
+    type: 'RFQ',
+    event_types: ['RFQ'],
+    status: 'Planned',
+    addressable: 1,
+    sourced: 0,
+    savings: 0,
+    start_date: '2026-03-15',
+    requestor: user.email,
+    requestor_id: user.id,
+    request_created_at: new Date().toISOString(),
+  });
+  assert.equal(error, null, `creating own request event failed: ${error?.message}`);
+  return eventId;
+}
+
+async function uploadTextAttachmentObject(client: SupabaseClient, eventId: string) {
+  const path = `${eventId}/${randomUUID()}.txt`;
+  const { error } = await client.storage
+    .from('request-attachments')
+    .upload(path, new Blob(['rls attachment test'], { type: 'text/plain' }), {
+      contentType: 'text/plain',
+      upsert: false,
+    });
+  assert.equal(error, null, `storage upload failed: ${error?.message}`);
+  return path;
 }
 
 test('non-admin cannot read audit_log', { skip: !isConfigured ? skipReason : false }, async () => {
@@ -92,6 +142,105 @@ test(
       assert.match(error.message, /row-level security|permission|policy/i);
     }
     await userClient.auth.signOut();
+  },
+);
+
+test(
+  'non-admin can attach an owned storage object to their own request event',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+    const user = await currentUser(userClient);
+    const eventId = await insertOwnRequestEvent(userClient, user);
+    const storagePath = await uploadTextAttachmentObject(userClient, eventId);
+
+    try {
+      const { error } = await userClient.from('event_attachments').insert({
+        event_id: eventId,
+        doc_type: 'RLS Test',
+        file_name: 'rls-attachment.txt',
+        storage_path: storagePath,
+        content_type: 'text/plain',
+        size_bytes: 19,
+        uploaded_by: user.id,
+      });
+      assert.equal(error, null, `own request attachment insert failed: ${error?.message}`);
+    } finally {
+      await userClient.from('event_attachments').delete().eq('storage_path', storagePath);
+      await userClient.storage.from('request-attachments').remove([storagePath]);
+      await userClient.from('sourcing_events').delete().eq('id', eventId);
+      await userClient.auth.signOut();
+    }
+  },
+);
+
+test(
+  'non-admin cannot attach metadata to an event they do not own',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+    const user = await currentUser(userClient);
+    const { data: events, error: selectError } = await userClient
+      .from('sourcing_events')
+      .select('id')
+      .is('request_created_at', null)
+      .limit(1);
+    assert.equal(selectError, null, `seeded event lookup failed: ${selectError?.message}`);
+    if (!events || events.length === 0) {
+      throw new Error('Seed at least one non-request event in the test project to run this assertion.');
+    }
+
+    const storagePath = await uploadTextAttachmentObject(userClient, `RLS-FORGED-${randomUUID().slice(0, 8)}`);
+    try {
+      const { error } = await userClient.from('event_attachments').insert({
+        event_id: events[0].id,
+        doc_type: 'RLS Test',
+        file_name: 'forged-event.txt',
+        storage_path: storagePath,
+        content_type: 'text/plain',
+        size_bytes: 19,
+        uploaded_by: user.id,
+      });
+      if (!error) {
+        await userClient.from('event_attachments').delete().eq('storage_path', storagePath);
+      }
+      assert.ok(error, 'inserting attachment metadata for an unowned event should be denied by RLS');
+      assert.match(error.message, /row-level security|permission|policy|violates/i);
+    } finally {
+      await userClient.storage.from('request-attachments').remove([storagePath]);
+      await userClient.auth.signOut();
+    }
+  },
+);
+
+test(
+  'non-admin cannot attach metadata for a storage object they did not upload',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+    const user = await currentUser(userClient);
+    const eventId = await insertOwnRequestEvent(userClient, user);
+    const missingStoragePath = `${eventId}/${randomUUID()}-missing.txt`;
+
+    try {
+      const { error } = await userClient.from('event_attachments').insert({
+        event_id: eventId,
+        doc_type: 'RLS Test',
+        file_name: 'missing-object.txt',
+        storage_path: missingStoragePath,
+        content_type: 'text/plain',
+        size_bytes: 19,
+        uploaded_by: user.id,
+      });
+      if (!error) {
+        await userClient.from('event_attachments').delete().eq('storage_path', missingStoragePath);
+      }
+      assert.ok(error, 'inserting attachment metadata without an owned storage object should be denied by RLS');
+      assert.match(error.message, /row-level security|permission|policy|violates/i);
+    } finally {
+      await userClient.from('sourcing_events').delete().eq('id', eventId);
+      await userClient.auth.signOut();
+    }
   },
 );
 

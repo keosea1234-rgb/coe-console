@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// Feedback submission is exercised through the standalone /feedback route
-// triggered by an emailed survey link. The link carries an event id + token
-// in the query string. We bypass that flow by going directly to /feedback
-// in the e2e test project, which renders an inline form for the test user.
+// Feedback submission is exercised through the standalone /feedback/:eventId
+// route triggered by an emailed survey link. E2E_FEEDBACK_TOKEN is retained for
+// seeded test projects that model signed survey links.
 //
 // Skipped unless the test project has at least one feedback-requested event
 // AND the test harness exposes its id via E2E_FEEDBACK_EVENT_ID + token.
@@ -14,7 +13,7 @@ test.describe('feedback submit', () => {
   test.skip(!eventId || !token, 'E2E_FEEDBACK_EVENT_ID / E2E_FEEDBACK_TOKEN not set');
 
   test('buyer can submit NPS feedback', async ({ page }) => {
-    await page.goto(`/feedback?event=${eventId}&token=${token}`);
+    await page.goto(`/feedback/${encodeURIComponent(eventId)}?token=${encodeURIComponent(token)}`);
     await page.getByLabel(/tool/i).first().fill('9');
     await page.getByLabel(/support/i).first().fill('10');
     await page.getByLabel(/comment/i).fill('Smooth process.');

@@ -35,9 +35,13 @@ In the dashboard: **Settings -> API**.
 
 Paste these into `coe-console/.env.local` (see `.env.example`). Never commit `.env.local`, and **never** share the `service_role` key - it bypasses RLS.
 
-## 4. Create your first users + promote an admin
+## 4. Create users + promote an admin
 
-1. In the dashboard: **Authentication -> Users -> Add user** (or sign up from the app once auth is wired). Create at least one user that will become the CoE admin.
+Production access is admin-created or invite-only. Keep public signup disabled
+unless a non-production environment deliberately sets
+`VITE_AUTH_SIGNUP_ENABLED=true`.
+
+1. In the dashboard: **Authentication -> Users -> Add user**. Create at least one user that will become the CoE admin.
 2. Run this in SQL Editor to promote them:
 
    ```sql
@@ -99,7 +103,7 @@ This reloads the deterministic `generateEvents()` dataset into
 | `spend_baseline`     | any signed-in | admin only               | admin only               | admin only                |
 | `feedback_responses` | admin / own   | own requested event only | own requested event only | blocked                   |
 | `audit_log`          | admin only    | trigger only             | blocked                  | blocked                   |
-| `event_attachments`  | any signed-in | self (uploaded_by = uid) | blocked                  | admin or uploader         |
+| `event_attachments`  | any signed-in | owned object + allowed event | blocked                  | admin or uploader         |
 | `client_errors`      | admin only    | self or anon             | blocked                  | blocked                   |
 
 ## Audit log retention
@@ -139,6 +143,7 @@ Preconditions:
 - Test project has every migration applied.
 - One profile is promoted to `admin`; another remains `user`.
 - At least one seeded (non-request) event exists in `sourcing_events`.
+- The `request-attachments` storage bucket exists from migration `0009`.
 
 When any env var is missing the tests skip cleanly so local runs are unaffected.
 

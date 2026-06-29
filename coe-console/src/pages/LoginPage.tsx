@@ -5,6 +5,8 @@ import { theme } from '../styles/theme';
 
 type Mode = 'signin' | 'signup';
 
+const PUBLIC_SIGNUP_ENABLED = import.meta.env.VITE_AUTH_SIGNUP_ENABLED?.toLowerCase() === 'true';
+
 export function LoginPage() {
   const signIn = useSession((s) => s.signIn);
   const signUp = useSession((s) => s.signUp);
@@ -22,6 +24,13 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     setInfo(null);
+
+    if (mode === 'signup' && !PUBLIC_SIGNUP_ENABLED) {
+      setBusy(false);
+      setError('Public signup is disabled. Ask a CoE admin to create or invite your account.');
+      return;
+    }
+
     const fn = mode === 'signin' ? signIn : signUp;
     const { error: errMsg } = await fn(email.trim(), password);
     setBusy(false);
@@ -67,15 +76,17 @@ export function LoginPage() {
           </div>
           <div style={{ fontSize: 17, fontWeight: 800, color: theme.ink }}>eSourcing CoE Console</div>
           <div style={{ fontSize: 12.5, color: theme.textSecondary, marginTop: 4 }}>
-            {mode === 'signin' ? 'Sign in to continue' : 'Create your account'}
+            {mode === 'signin' || !PUBLIC_SIGNUP_ENABLED ? 'Sign in to continue' : 'Create your account'}
           </div>
         </div>
 
         <Card style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <TabButton active={mode === 'signin'} onClick={() => switchMode('signin')}>Sign in</TabButton>
-            <TabButton active={mode === 'signup'} onClick={() => switchMode('signup')}>Sign up</TabButton>
-          </div>
+          {PUBLIC_SIGNUP_ENABLED && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <TabButton active={mode === 'signin'} onClick={() => switchMode('signin')}>Sign in</TabButton>
+              <TabButton active={mode === 'signup'} onClick={() => switchMode('signup')}>Sign up</TabButton>
+            </div>
+          )}
 
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Field
@@ -117,7 +128,7 @@ export function LoginPage() {
                 transition: `all ${theme.transitionFast} ${theme.easing}`,
               }}
             >
-              {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+              {busy ? 'Please wait…' : mode === 'signup' && PUBLIC_SIGNUP_ENABLED ? 'Create account' : 'Sign in'}
             </button>
           </form>
         </Card>
