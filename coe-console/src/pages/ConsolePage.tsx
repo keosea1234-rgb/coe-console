@@ -150,7 +150,7 @@ export function ConsolePage() {
           </div>
         ) : (
           <>
-            {tab !== 'coverageMap' && (
+            {tab === 'exec' && (
               <>
                 <KpiRow totals={totals} />
                 <InsightsStrip insights={insights} />

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { theme } from '../../styles/theme';
+import { theme, sectionLabel } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import type { FeedbackResponse, SourcingEvent } from '../../domain/types';
 import { fmtUSD } from '../../domain/selectors';
 import { STATUSES, type Status } from '../../domain/constants';
 import { useStore } from '../../domain/store';
 import { Button, StatusBadge } from '../common/primitives';
+import { SlideOver } from '../common/overlays';
 import { CATEGORY_BY_NAME } from '../../domain/categories';
 import { canEmailFeedback, openFeedbackEmail } from '../../lib/feedbackEmail';
+import { openRequestorReplyEmail, scopeLine } from '../../lib/coeRequestEmail';
 import {
   createAttachmentDownloadUrl,
   listAttachmentsForEvents,
@@ -236,6 +238,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const archiveEvent = useStore((s) => s.archiveEvent);
   const unarchiveEvent = useStore((s) => s.unarchiveEvent);
   const [filter, setFilter] = useState<'active' | 'new' | 'archived' | 'all'>('active');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [attachmentsByEvent, setAttachmentsByEvent] = useState<Record<string, AttachmentRow[]>>({});
   const [attachmentLoadError, setAttachmentLoadError] = useState<string | null>(null);
   const [attachmentDownloadUrls, setAttachmentDownloadUrls] = useState<Record<string, string>>({});
@@ -262,6 +265,10 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const totalSpend = visible.reduce((sum, e) => sum + (e.addressable || 0), 0);
   const activeCount = requests.filter((e) => !e.archivedAt).length;
   const archivedCount = requests.length - activeCount;
+
+  // Resolve the open row against live data so the panel reflects status/archive
+  // changes made while it is open.
+  const detailEvent = selectedId ? events.find((e) => e.id === selectedId) ?? null : null;
 
   useEffect(() => {
     const eventIds = requests.map((event) => event.id);
@@ -333,6 +340,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   };
 
   return (
+    <>
     <Card pad={0}>
       <div
         style={{
@@ -437,7 +445,13 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                   !e.archivedAt &&
                   Date.now() - new Date(e.requestCreatedAt).getTime() < 24 * 60 * 60 * 1000;
                 return (
-                  <tr key={e.id}>
+                  <tr
+                    key={e.id}
+                    onClick={() => setSelectedId(e.id)}
+                    title="Open request"
+                    style={{ cursor: 'pointer' }}
+                    className="my-request-row"
+                  >
                     <td style={td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {isFresh && (
@@ -513,7 +527,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                       </div>
                     </td>
                     <td style={num}>{fmtUSD(e.addressable)}</td>
-                    <td style={td}>
+                    <td style={td} onClick={(ev) => ev.stopPropagation()}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <StatusBadge status={e.status} />
                         <select
@@ -537,7 +551,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                         </select>
                       </div>
                     </td>
-                    <td style={td}>
+                    <td style={td} onClick={(ev) => ev.stopPropagation()}>
                       <AttachmentsCell
                         attachments={attachmentsByEvent[e.id]}
                         error={attachmentLoadError}
@@ -547,7 +561,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                         onDownload={(attachment) => void downloadAttachment(attachment)}
                       />
                     </td>
-                    <td style={td}>
+                    <td style={td} onClick={(ev) => ev.stopPropagation()}>
                       <FeedbackCell
                         event={e}
                         response={feedbackResponses.find((response) => response.eventId === e.id)}
@@ -556,7 +570,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                         }}
                       />
                     </td>
-                    <td style={td}>
+                    <td style={td} onClick={(ev) => ev.stopPropagation()}>
                       {e.archivedAt ? (
                         <Button
                           variant="ghost"
@@ -598,5 +612,228 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
         </table>
       </div>
     </Card>
+
+      <RequestInboxDetail
+        key={detailEvent?.id ?? 'none'}
+        event={detailEvent}
+        onClose={() => setSelectedId(null)}
+        attachments={detailEvent ? attachmentsByEvent[detailEvent.id] : undefined}
+        attachmentLoadError={attachmentLoadError}
+        downloadUrls={attachmentDownloadUrls}
+        downloadUrlError={downloadUrlError}
+        downloadingId={downloadingAttachmentId}
+        onDownload={(attachment) => void downloadAttachment(attachment)}
+        feedbackResponse={
+          detailEvent
+            ? feedbackResponses.find((response) => response.eventId === detailEvent.id)
+            : undefined
+        }
+        onRequestFeedback={(event) => {
+          if (openFeedbackEmail(event)) void requestEventFeedback(event.id);
+        }}
+        onStatusChange={(id, status) => updateEventStatus(id, status)}
+        onArchive={(id) => void archiveEvent(id)}
+        onUnarchive={(id) => void unarchiveEvent(id)}
+      />
+    </>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '9px 0',
+        borderBottom: `1px solid ${theme.border}`,
+      }}
+    >
+      <span style={{ fontSize: 11.5, color: theme.textTertiary, fontFamily: theme.mono }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: theme.ink, fontWeight: 600, textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
+
+function RequestInboxDetail({
+  event,
+  onClose,
+  attachments,
+  attachmentLoadError,
+  downloadUrls,
+  downloadUrlError,
+  downloadingId,
+  onDownload,
+  feedbackResponse,
+  onRequestFeedback,
+  onStatusChange,
+  onArchive,
+  onUnarchive,
+}: {
+  event: SourcingEvent | null;
+  onClose: () => void;
+  attachments?: AttachmentRow[];
+  attachmentLoadError: string | null;
+  downloadUrls: Record<string, string>;
+  downloadUrlError: string | null;
+  downloadingId: string | null;
+  onDownload: (attachment: AttachmentRow) => void;
+  feedbackResponse?: FeedbackResponse;
+  onRequestFeedback: (event: SourcingEvent) => void;
+  onStatusChange: (id: string, status: Status) => void;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
+}) {
+  const [reply, setReply] = useState('');
+
+  if (!event) return null;
+  const cat = CATEGORY_BY_NAME[event.category];
+  const badges = [
+    event.directness,
+    event.shouldCostModeling ? 'Should-cost' : undefined,
+    event.riskAssessment ? 'Risk' : undefined,
+    event.esgAssessment ? 'ESG' : undefined,
+  ].filter(Boolean) as string[];
+
+  return (
+    <SlideOver
+      open={!!event}
+      onClose={onClose}
+      width={480}
+      title={
+        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{ width: 8, height: 8, borderRadius: 2, background: cat?.color ?? theme.primary, flexShrink: 0 }}
+          />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: theme.ink, lineHeight: 1.2 }}>{event.name}</div>
+            <div style={{ fontSize: 11, color: theme.textTertiary, fontFamily: theme.mono, marginTop: 2 }}>
+              {event.id}
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <div style={{ padding: '16px 18px', display: 'grid', gap: 16 }}>
+        <div>
+          <DetailRow label="Requestor" value={event.requestor ?? '-'} />
+          <DetailRow label="Received" value={fmtReceivedAt(event.requestCreatedAt)} />
+          <DetailRow label="Scope" value={scopeLine(event)} />
+          <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
+          <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
+          {badges.length > 0 && (
+            <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {badges.map((badge) => (
+                <span
+                  key={badge}
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    fontFamily: theme.mono,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    color: theme.textSecondary,
+                    background: theme.surfaceMuted,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={sectionLabel}>Status</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <StatusBadge status={event.status} />
+            <select
+              className="ui-select"
+              aria-label={`Change status for ${event.name}`}
+              value={event.status}
+              onChange={(ev) => onStatusChange(event.id, ev.target.value as Status)}
+              style={{ width: 150, height: 32, fontSize: 12, fontWeight: 700, paddingLeft: 9 }}
+            >
+              {STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={sectionLabel}>Attachments</div>
+          <AttachmentsCell
+            attachments={attachments}
+            error={attachmentLoadError}
+            downloadUrls={downloadUrls}
+            downloadUrlError={downloadUrlError}
+            downloadingId={downloadingId}
+            onDownload={onDownload}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={sectionLabel}>Feedback</div>
+          <FeedbackCell event={event} response={feedbackResponse} onRequest={() => onRequestFeedback(event)} />
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={sectionLabel}>Reply to requestor</div>
+          <p style={{ margin: 0, fontSize: 12, color: theme.textSecondary, lineHeight: 1.45 }}>
+            Send an update to {event.requestor ?? 'the requestor'}. We'll prefill the request context and open
+            your email client.
+          </p>
+          <textarea
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            rows={5}
+            placeholder="e.g. Picked up - kicking off supplier shortlist this week. Will share the bid template by Friday."
+            style={{
+              width: '100%',
+              resize: 'vertical',
+              borderRadius: theme.radiusSm,
+              border: `1px solid ${theme.borderStrong}`,
+              background: theme.surface,
+              color: theme.ink,
+              padding: '10px 12px',
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              fontFamily: 'inherit',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button
+              variant="primary"
+              disabled={!event.requestor?.includes('@')}
+              onClick={() => openRequestorReplyEmail(event, reply)}
+            >
+              Send reply
+            </Button>
+            {event.archivedAt ? (
+              <Button variant="secondary" onClick={() => onUnarchive(event.id)}>
+                Restore
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const ok = window.confirm(
+                    `Archive ${event.id}? It will leave the active inbox but remain available for audit.`,
+                  );
+                  if (ok) onArchive(event.id);
+                }}
+              >
+                Archive
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </SlideOver>
   );
 }

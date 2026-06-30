@@ -4,6 +4,7 @@ import { RequestFormPage } from './pages/RequestFormPage';
 import { FeedbackPage } from './pages/FeedbackPage';
 import { LoginPage } from './pages/LoginPage';
 import { useSession } from './domain/session';
+import { DevAccountSwitch } from './components/dev/DevAccountSwitch';
 import { theme } from './styles/theme';
 
 function AuthGate({ children }: { children: React.ReactElement }) {
@@ -57,6 +58,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthGate>
+        <>
         <Routes>
           <Route
             path="/login"
@@ -92,6 +94,8 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <DevAccountSwitch />
+        </>
       </AuthGate>
     </BrowserRouter>
   );

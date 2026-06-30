@@ -995,6 +995,11 @@ select:disabled {
   background: #a8b0bc;
 }
 
+/* My requests — clickable rows */
+.my-request-row:hover {
+  background: #f8fafc;
+}
+
 /* Animations */
 @keyframes fadeUp {
   from {
