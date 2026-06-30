@@ -98,6 +98,28 @@ export function baselineAddr(fy: FY, cat: Category, region: Region): number {
   return cat.baseSpend * 1e6 * REGION_W[region] * FY_GROWTH[fy] * (0.85 + jitter);
 }
 
+const REGION_COVERAGE_TARGET: Record<Region, number> = {
+  LATAM: 0.36,
+  APAC: 0.58,
+  NA: 0.72,
+  EMEA: 0.86,
+};
+
+const FY_COVERAGE_OFFSET: Record<FY, number> = {
+  FY25: 0.03,
+  FY26: 0,
+  FY27: -0.03,
+};
+
+const CATEGORY_COVERAGE_OFFSETS = [-0.14, -0.1, -0.06, -0.02, 0.02, 0.06, 0.1, 0.14];
+
+function coverageTarget(fy: FY, cat: Category, region: Region): number {
+  const categoryOffset = CATEGORY_COVERAGE_OFFSETS[(Number(cat.id) - 1) % CATEGORY_COVERAGE_OFFSETS.length];
+  const jitter = (hash01(`coverage|${fy}|${cat.id}|${region}`) - 0.5) * 0.04;
+  const target = REGION_COVERAGE_TARGET[region] + FY_COVERAGE_OFFSET[fy] + categoryOffset + jitter;
+  return Math.max(0.22, Math.min(0.95, target));
+}
+
 export function generateEvents(seed = 20260624): SourcingEvent[] {
   const rng = mulberry32(seed);
   const events: SourcingEvent[] = [];
@@ -108,8 +130,7 @@ export function generateEvents(seed = 20260624): SourcingEvent[] {
       const weights = subWeights(cat);
       for (const region of REGIONS as Region[]) {
         const addr = baselineAddr(fy, cat, region);
-        const coverageTarget = 0.2 + rng() * 0.58; // 20–78%
-        const sourcedTotal = addr * coverageTarget;
+        const sourcedTotal = addr * coverageTarget(fy, cat, region);
         const nEvents = 1 + Math.floor(rng() * 3); // 1–3
 
         // distribute sourced across nEvents
