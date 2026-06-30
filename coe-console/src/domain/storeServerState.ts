@@ -33,6 +33,8 @@ export function createServerStateSlice(
   return {
     ...createInitialServerState(),
 
+    clearError: () => set({ error: null }),
+
     refreshEvents: async () => {
       set({ loading: true, error: null });
       try {
@@ -89,6 +91,21 @@ export function createServerStateSlice(
         await repository.archiveEvent(id, user.id, archivedAt);
       } catch (err) {
         console.error('[store] archiveEvent failed; reverting', err);
+        set({ events: prev, error: (err as Error).message });
+      }
+    },
+
+    unarchiveEvent: async (id) => {
+      const prev = get().events;
+      set({
+        events: prev.map((event) =>
+          event.id === id ? { ...event, archivedAt: undefined, archivedBy: undefined } : event,
+        ),
+      });
+      try {
+        await repository.unarchiveEvent(id);
+      } catch (err) {
+        console.error('[store] unarchiveEvent failed; reverting', err);
         set({ events: prev, error: (err as Error).message });
       }
     },

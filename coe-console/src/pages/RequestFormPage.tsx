@@ -280,6 +280,7 @@ export function RequestFormPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [emailHint, setEmailHint] = useState<string | undefined>();
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
@@ -485,6 +486,7 @@ export function RequestFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting || saved) return;
     if (!validate()) return;
     if (hasInvalidAttachment) {
       setErrors((prev) => ({
@@ -494,53 +496,58 @@ export function RequestFormPage() {
       return;
     }
 
-    const event = buildRequestEvent(currentRequestInput(), new Date().toISOString());
-
+    setSubmitting(true);
     try {
-      await addEvent(event);
-    } catch (err) {
-      setErrors({ submit: err instanceof Error ? err.message : 'Failed to save event.' });
-      return;
-    }
+      const event = buildRequestEvent(currentRequestInput(), new Date().toISOString());
 
-    const uploadable = attachments.filter((a) => !a.error);
-    let failures: Array<{ name: string; message: string }> = [];
-
-    if (uploadable.length > 0 && sessionUser?.id) {
-      setUploadStatus('uploading');
-      setUploadProgress({ done: 0, total: uploadable.length });
-      for (let i = 0; i < uploadable.length; i++) {
-        const row = uploadable[i];
-        try {
-          await uploadAttachment({
-            eventId: event.id,
-            docType: row.docType,
-            file: row.file,
-            uploaderId: sessionUser.id,
-          });
-        } catch (err) {
-          failures.push({
-            name: row.file.name,
-            message: err instanceof Error ? err.message : 'Upload failed.',
-          });
-        }
-        setUploadProgress({ done: i + 1, total: uploadable.length });
+      try {
+        await addEvent(event);
+      } catch (err) {
+        setErrors({ submit: err instanceof Error ? err.message : 'Failed to save event.' });
+        return;
       }
-      setUploadFailures(failures);
-      setUploadStatus(failures.length === 0 ? 'idle' : 'partial-failure');
-    }
 
-    if (failures.length > 0) {
-      // Event saved but some files failed — let the user decide what to do.
-      // Draft is preserved so the user can retry uploads or remove failed rows.
-      return;
-    }
+      const uploadable = attachments.filter((a) => !a.error);
+      let failures: Array<{ name: string; message: string }> = [];
 
-    window.localStorage.removeItem(REQUEST_DRAFT_KEY);
-    setDraftSavedAt(null);
-    setDraftRestored(false);
-    setSaved(true);
-    window.setTimeout(() => navigate('/'), 600);
+      if (uploadable.length > 0 && sessionUser?.id) {
+        setUploadStatus('uploading');
+        setUploadProgress({ done: 0, total: uploadable.length });
+        for (let i = 0; i < uploadable.length; i++) {
+          const row = uploadable[i];
+          try {
+            await uploadAttachment({
+              eventId: event.id,
+              docType: row.docType,
+              file: row.file,
+              uploaderId: sessionUser.id,
+            });
+          } catch (err) {
+            failures.push({
+              name: row.file.name,
+              message: err instanceof Error ? err.message : 'Upload failed.',
+            });
+          }
+          setUploadProgress({ done: i + 1, total: uploadable.length });
+        }
+        setUploadFailures(failures);
+        setUploadStatus(failures.length === 0 ? 'idle' : 'partial-failure');
+      }
+
+      if (failures.length > 0) {
+        // Event saved but some files failed — let the user decide what to do.
+        // Draft is preserved so the user can retry uploads or remove failed rows.
+        return;
+      }
+
+      window.localStorage.removeItem(REQUEST_DRAFT_KEY);
+      setDraftSavedAt(null);
+      setDraftRestored(false);
+      setSaved(true);
+      window.setTimeout(() => navigate('/'), 600);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const fyOptions = [
@@ -577,8 +584,8 @@ export function RequestFormPage() {
             <div style={{ fontSize: 13, fontWeight: 700, color: theme.ink }}>New Event Request</div>
             <div style={{ fontSize: 11, color: theme.textSecondary }}>Log an eSourcing event</div>
           </div>
-          <Button type="submit" form="event-form" variant="primary" disabled={saved}>
-            Save event
+          <Button type="submit" form="event-form" variant="primary" disabled={saved || submitting}>
+            {submitting ? 'Saving…' : 'Save event'}
           </Button>
         </div>
       </header>
@@ -1073,8 +1080,8 @@ export function RequestFormPage() {
           </Card>
 
           <div style={{ display: 'flex', gap: 10, paddingTop: 4, flexWrap: 'wrap' }}>
-            <Button type="submit" variant="primary" disabled={saved}>
-              Save event
+            <Button type="submit" variant="primary" disabled={saved || submitting}>
+              {submitting ? 'Saving…' : 'Save event'}
             </Button>
             <Link to="/" className="ui-btn ui-btn--ghost" style={{ textDecoration: 'none' }}>
               Back to console

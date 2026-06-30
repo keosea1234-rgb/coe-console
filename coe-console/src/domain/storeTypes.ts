@@ -51,6 +51,7 @@ export interface ConsoleRepository {
   insertEvent: (event: SourcingEvent, requestorId: string | null) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   archiveEvent: (id: string, actorId: string, archivedAt: string) => Promise<void>;
+  unarchiveEvent: (id: string) => Promise<void>;
   updateEventStatus: (id: string, status: Status) => Promise<void>;
   markFeedbackRequested: (id: string) => Promise<void>;
   listFeedbackResponses: () => Promise<FeedbackResponse[]>;
@@ -75,6 +76,8 @@ export interface ServerActions {
   addEvent: (event: SourcingEvent) => Promise<void>;
   removeEvent: (id: string) => Promise<void>;
   archiveEvent: (id: string) => Promise<void>;
+  unarchiveEvent: (id: string) => Promise<void>;
+  clearError: () => void;
   updateEventStatus: (id: string, status: Status) => Promise<void>;
   requestEventFeedback: (id: string) => Promise<void>;
   refreshFeedbackResponses: () => Promise<void>;

@@ -54,6 +54,11 @@ function createMemoryRepository() {
       const index = events.findIndex((event) => event.id === id);
       if (index >= 0) events[index] = { ...events[index], archivedAt, archivedBy: actorId };
     },
+    unarchiveEvent: async (id) => {
+      calls.push({ name: 'unarchiveEvent', args: [id] });
+      const index = events.findIndex((event) => event.id === id);
+      if (index >= 0) events[index] = { ...events[index], archivedAt: undefined, archivedBy: undefined };
+    },
     updateEventStatus: async (id, status) => {
       calls.push({ name: 'updateEventStatus', args: [id, status] });
       const index = events.findIndex((event) => event.id === id);
@@ -133,6 +138,11 @@ test('request intake, admin workflow, and buyer feedback stay in sync', async ()
   assert.equal(archived?.feedbackRequested, true);
   assert.equal(archived?.archivedAt, '2026-06-28T12:00:00.000Z');
   assert.equal(archived?.archivedBy, admin.id);
+
+  await store.getState().unarchiveEvent(created.id);
+  const restored = store.getState().events.find((event) => event.id === created.id);
+  assert.equal(restored?.archivedAt, undefined);
+  assert.equal(restored?.archivedBy, undefined);
 
   currentUser = buyer;
   const result = await store.getState().submitFeedbackResponse({

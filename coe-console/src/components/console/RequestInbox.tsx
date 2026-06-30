@@ -234,6 +234,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const requestEventFeedback = useStore((s) => s.requestEventFeedback);
   const feedbackResponses = useStore((s) => s.feedbackResponses);
   const archiveEvent = useStore((s) => s.archiveEvent);
+  const unarchiveEvent = useStore((s) => s.unarchiveEvent);
   const [filter, setFilter] = useState<'active' | 'new' | 'archived' | 'all'>('active');
   const [attachmentsByEvent, setAttachmentsByEvent] = useState<Record<string, AttachmentRow[]>>({});
   const [attachmentLoadError, setAttachmentLoadError] = useState<string | null>(null);
@@ -556,24 +557,38 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
                       />
                     </td>
                     <td style={td}>
-                      <Button
-                        variant="ghost"
-                        disabled={!!e.archivedAt}
-                        onClick={() => {
-                          const ok = window.confirm(
-                            `Archive ${e.id}? It will leave the active inbox but remain available for audit.`,
-                          );
-                          if (ok) void archiveEvent(e.id);
-                        }}
-                        style={{
-                          height: 28,
-                          padding: '6px 9px',
-                          fontSize: 11.5,
-                          color: e.archivedAt ? theme.textTertiary : theme.textSecondary,
-                        }}
-                      >
-                        {e.archivedAt ? 'Archived' : 'Archive'}
-                      </Button>
+                      {e.archivedAt ? (
+                        <Button
+                          variant="ghost"
+                          onClick={() => void unarchiveEvent(e.id)}
+                          style={{
+                            height: 28,
+                            padding: '6px 9px',
+                            fontSize: 11.5,
+                            color: theme.textSecondary,
+                          }}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            const ok = window.confirm(
+                              `Archive ${e.id}? It will leave the active inbox but remain available for audit.`,
+                            );
+                            if (ok) void archiveEvent(e.id);
+                          }}
+                          style={{
+                            height: 28,
+                            padding: '6px 9px',
+                            fontSize: 11.5,
+                            color: theme.textSecondary,
+                          }}
+                        >
+                          Archive
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );

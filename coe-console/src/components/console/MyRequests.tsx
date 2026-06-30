@@ -101,10 +101,10 @@ export function MyRequests({
       return requests.filter((event) => !!event.archivedAt || event.status !== 'Planned');
     }
     if (filter === 'all') return requests;
-    return requests.filter((event) => !event.archivedAt && event.status !== 'Completed');
+    return requests.filter((event) => !event.archivedAt && event.status === 'Planned');
   }, [filter, requests]);
 
-  const openCount = requests.filter((event) => !event.archivedAt && event.status !== 'Completed').length;
+  const openCount = requests.filter((event) => !event.archivedAt && event.status === 'Planned').length;
   const managedCount = requests.filter((event) => !!event.archivedAt || event.status !== 'Planned').length;
   const completedCount = requests.filter((event) => event.status === 'Completed').length;
   const pipeline = requests.reduce((sum, event) => sum + event.addressable, 0);
@@ -119,7 +119,7 @@ export function MyRequests({
         }}
       >
         <StatTile label="Submitted" value={requests.length} sub="Total eSourcing requests" />
-        <StatTile label="Open" value={openCount} sub="Not completed or archived" />
+        <StatTile label="Open" value={openCount} sub="Awaiting CoE pickup" />
         <StatTile label="Managed" value={managedCount} sub="Live, completed, or archived" />
         <StatTile label="Pipeline" value={fmtUSD(pipeline)} sub="Submitted addressable spend" />
       </div>

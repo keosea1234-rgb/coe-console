@@ -125,6 +125,14 @@ export async function archiveEvent(id: string, actorId: string, archivedAt = new
   if (error) throw error;
 }
 
+export async function unarchiveEvent(id: string) {
+  const { error } = await supabase
+    .from('sourcing_events')
+    .update({ archived_at: null, archived_by: null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 export async function updateEventStatus(id: string, status: Status) {
   const { error } = await supabase
     .from('sourcing_events')
