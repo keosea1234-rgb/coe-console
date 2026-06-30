@@ -9,3 +9,8 @@ dist-ssr
 playwright-report
 test-results
 .playwright
+
+# Local scratch / preview harness artifacts
+mapcheck.html
+src/mapcheck.tsx
+my-requests-preview.*
