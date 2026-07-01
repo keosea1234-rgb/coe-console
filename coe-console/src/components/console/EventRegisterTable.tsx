@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { theme } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import { CATEGORY_BY_NAME } from '../../domain/categories';
@@ -9,39 +9,7 @@ import { useStore } from '../../domain/store';
 import { Button, StatusBadge } from '../common/primitives';
 import { Modal } from '../common/overlays';
 import { openFeedbackEmail } from '../../lib/feedbackEmail';
-
-const th: React.CSSProperties = {
-  textAlign: 'left',
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '.06em',
-  textTransform: 'uppercase',
-  color: theme.textTertiary,
-  fontFamily: theme.mono,
-  padding: '9px 12px',
-  position: 'sticky',
-  top: 0,
-  background: theme.surfaceRaised,
-  borderBottom: `1px solid ${theme.border}`,
-  zIndex: 1,
-};
-const td: React.CSSProperties = {
-  fontSize: 12.5,
-  padding: '9px 12px',
-  borderBottom: `1px solid ${theme.border}`,
-  whiteSpace: 'nowrap',
-  color: theme.ink,
-};
-const num: React.CSSProperties = {
-  ...td,
-  fontFamily: theme.mono,
-  textAlign: 'right',
-  fontVariantNumeric: 'tabular-nums',
-};
-const actionCell: React.CSSProperties = {
-  ...td,
-  minWidth: 190,
-};
+import { DataTable, type TableColumn } from '../../shared/table';
 
 function FeedbackButton({
   requested,
@@ -210,156 +178,187 @@ export function EventRegisterTable({
   const removeEvent = useStore((s) => s.removeEvent);
   const [feedbackEvent, setFeedbackEvent] = useState<SourcingEvent | null>(null);
   const rows = events.slice(0, 50);
+
+  const columns = useMemo<TableColumn<SourcingEvent>[]>(
+    () => [
+      {
+        id: 'event',
+        header: 'Event',
+        sortable: true,
+        sortValue: (event) => event.name,
+        minWidth: 230,
+        cell: (event) => {
+          const category = CATEGORY_BY_NAME[event.category];
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 2,
+                  background: category?.color,
+                  flexShrink: 0,
+                }}
+              />
+              <div>
+                <div style={{ fontWeight: 600 }}>{event.name}</div>
+                <div style={{ fontSize: 10.5, color: theme.textTertiary, fontFamily: theme.mono }}>
+                  {event.id}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'region',
+        header: 'Region',
+        sortable: true,
+        sortValue: (event) => (event.regions ?? [event.region]).join(', '),
+        cell: (event) => (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {(event.regions ?? [event.region]).map((region) => (
+              <span
+                key={region}
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  fontFamily: theme.mono,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: theme.surfaceMuted,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.textSecondary,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {region}
+              </span>
+            ))}
+          </div>
+        ),
+      },
+      {
+        id: 'fy',
+        header: 'FY',
+        sortable: true,
+        sortValue: (event) => event.fy,
+        cellStyle: { fontFamily: theme.mono },
+        cell: (event) => event.fy,
+      },
+      {
+        id: 'type',
+        header: 'Type',
+        sortable: true,
+        sortValue: (event) => (event.eventTypes ?? [event.type]).join(' + '),
+        cell: (event) => (event.eventTypes ?? [event.type]).join(' + '),
+      },
+      {
+        id: 'addressable',
+        header: 'Addressable',
+        align: 'right',
+        sortable: true,
+        sortValue: (event) => event.addressable,
+        cell: (event) => fmtUSD(event.addressable),
+      },
+      {
+        id: 'sourced',
+        header: 'Sourced',
+        align: 'right',
+        sortable: true,
+        sortValue: (event) => event.sourced,
+        cell: (event) => fmtUSD(event.sourced),
+      },
+      {
+        id: 'savings',
+        header: 'Savings',
+        align: 'right',
+        sortable: true,
+        sortValue: (event) => event.savings,
+        cell: (event) => (
+          <span style={{ color: event.savings > 0 ? theme.success : theme.textTertiary }}>
+            {event.savings > 0 ? fmtUSD(event.savings) : '-'}
+          </span>
+        ),
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        sortable: true,
+        sortValue: (event) => event.status,
+        minWidth: readOnly ? 100 : 210,
+        cell: (event) => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StatusBadge status={event.status} />
+            {!readOnly && (
+              <select
+                className="ui-select"
+                aria-label={`Change status for ${event.name}`}
+                value={event.status}
+                onChange={(selectEvent) => updateEventStatus(event.id, selectEvent.target.value as Status)}
+                style={{
+                  width: 116,
+                  height: 30,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  paddingLeft: 9,
+                }}
+              >
+                {STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [readOnly, updateEventStatus],
+  );
+
   return (
     <Card pad={0}>
       <div style={{ padding: '16px 18px 12px' }}>
         <CardTitle sub={`Latest ${rows.length} events in scope`}>Event register</CardTitle>
       </div>
-      <div style={{ overflowX: 'auto', maxHeight: 520 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1040 }}>
-          <thead>
-            <tr>
-              <th style={th}>Event</th>
-              <th style={th}>Region</th>
-              <th style={th}>FY</th>
-              <th style={th}>Type</th>
-              <th style={{ ...th, textAlign: 'right' }}>Addressable</th>
-              <th style={{ ...th, textAlign: 'right' }}>Sourced</th>
-              <th style={{ ...th, textAlign: 'right' }}>Savings</th>
-              <th style={th}>Status</th>
-              {!readOnly && <th style={th}>Ask feedback</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={readOnly ? 8 : 9} style={{ ...td, textAlign: 'center', color: theme.textTertiary, padding: 32 }}>
-                  No events in the current filter scope.
-                </td>
-              </tr>
-            ) : (
-              rows.map((e) => {
-                const cat = CATEGORY_BY_NAME[e.category];
-                return (
-                  <tr
-                    key={e.id}
-                    style={{ transition: `background ${theme.transitionFast} ${theme.easing}` }}
-                    onMouseEnter={(ev) => {
-                      ev.currentTarget.style.background = theme.surfaceMuted;
-                    }}
-                    onMouseLeave={(ev) => {
-                      ev.currentTarget.style.background = 'transparent';
-                    }}
+      <DataTable
+        rows={rows}
+        columns={columns}
+        getRowId={(event) => event.id}
+        emptyMessage="No events in the current filter scope."
+        pageSize={25}
+        pageSizeOptions={[10, 25, 50]}
+        minWidth={1040}
+        maxHeight={520}
+        tableLabel="Event register"
+        rowActions={
+          readOnly
+            ? undefined
+            : (event) => (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <FeedbackButton
+                    requested={event.feedbackRequested}
+                    disabled={false}
+                    onClick={() => setFeedbackEvent(event)}
                   >
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span
-                          style={{
-                            width: 7,
-                            height: 7,
-                            borderRadius: 2,
-                            background: cat?.color,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{e.name}</div>
-                          <div
-                            style={{
-                              fontSize: 10.5,
-                              color: theme.textTertiary,
-                              fontFamily: theme.mono,
-                            }}
-                          >
-                            {e.id}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                        {(e.regions ?? [e.region]).map((r) => (
-                          <span
-                            key={r}
-                            style={{
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              fontFamily: theme.mono,
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              background: theme.surfaceMuted,
-                              border: `1px solid ${theme.border}`,
-                              color: theme.textSecondary,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {r}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td style={{ ...td, fontFamily: theme.mono }}>{e.fy}</td>
-                    <td style={td}>{(e.eventTypes ?? [e.type]).join(' + ')}</td>
-                    <td style={num}>{fmtUSD(e.addressable)}</td>
-                    <td style={num}>{fmtUSD(e.sourced)}</td>
-                    <td style={{ ...num, color: e.savings > 0 ? theme.success : theme.textTertiary }}>
-                      {e.savings > 0 ? fmtUSD(e.savings) : '-'}
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <StatusBadge status={e.status} />
-                        {!readOnly && (
-                          <select
-                            className="ui-select"
-                            aria-label={`Change status for ${e.name}`}
-                            value={e.status}
-                            onChange={(event) => updateEventStatus(e.id, event.target.value as Status)}
-                            style={{
-                              width: 116,
-                              height: 30,
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              paddingLeft: 9,
-                            }}
-                          >
-                            {STATUSES.map((status) => (
-                              <option key={status} value={status}>
-                                {status}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </td>
-                    {!readOnly && (
-                      <td style={actionCell}>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <FeedbackButton
-                            requested={e.feedbackRequested}
-                            disabled={false}
-                            onClick={() => setFeedbackEvent(e)}
-                          >
-                            Ask feedback
-                          </FeedbackButton>
-                          {e.requestCreatedAt && (
-                            <Button
-                              variant="ghost"
-                              onClick={() => removeEvent(e.id)}
-                              style={{ height: 28, padding: '6px 9px', fontSize: 11.5, color: theme.danger }}
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                    Ask feedback
+                  </FeedbackButton>
+                  {event.requestCreatedAt && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => removeEvent(event.id)}
+                      style={{ height: 28, padding: '6px 9px', fontSize: 11.5, color: theme.danger }}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              )
+        }
+        rowActionsHeader="Ask feedback"
+      />
       <FeedbackSurveyModal
         event={feedbackEvent}
         onClose={() => setFeedbackEvent(null)}
