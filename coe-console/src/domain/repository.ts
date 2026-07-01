@@ -1,8 +1,9 @@
 import { supabase } from '../lib/supabase';
-import type { FY, Region, Status } from './constants';
+import { isEnvFlagEnabled } from '../lib/env';
+import { REGIONS, STATUSES, type FY, type Region, type Status } from './constants';
 import type { Database } from './database.types';
 import { generateEvents } from './generateEvents';
-import { baselineKey, type SpendBaseline } from './selectors';
+import { baselineKey, type DashboardSummary, type SpendBaseline } from './selectors';
 import type { FeedbackResponse, RequestUpdate, SourcingEvent } from './types';
 
 type SourcingEventRow = Database['public']['Tables']['sourcing_events']['Row'];
@@ -12,17 +13,39 @@ type FeedbackResponseRow = Database['public']['Tables']['feedback_responses']['R
 type FeedbackResponseInsert = Database['public']['Tables']['feedback_responses']['Insert'];
 type RequestUpdateRow = Database['public']['Tables']['request_updates']['Row'];
 type RequestUpdateInsert = Database['public']['Tables']['request_updates']['Insert'];
+type DashboardSummaryFunction = Database['public']['Functions']['dashboard_summary'];
 type LegacySourcingEventRow = Omit<SourcingEventRow, 'status'> & {
   status: SourcingEventRow['status'] | 'Awarded';
 };
 
 // Postgres numeric comes back as string; coerce defensively.
-const num = (v: number | string) => (typeof v === 'string' ? Number(v) : v);
+const num = (v: unknown): number => {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' || typeof v === 'bigint') return Number(v);
+  return 0;
+};
 
 // undefined → null for fields that are nullable in DB.
 const opt = <T>(v: T | undefined): T | null => (v === undefined ? null : v);
 const normalizeStatus = (status: LegacySourcingEventRow['status']): Status =>
   status === 'Awarded' ? 'Completed' : status;
+export const isDemoModeEnabled = () => isEnvFlagEnabled('VITE_DEMO_MODE');
+
+export function eventsOrDemoFallback(events: SourcingEvent[]): SourcingEvent[] {
+  return events.length || !isDemoModeEnabled() ? events : generateEvents();
+}
+
+export interface DashboardSummaryRpcRow {
+  total_addressable: number | string | null;
+  total_sourced: number | string | null;
+  total_savings: number | string | null;
+  total_events: number | string | bigint | null;
+  live_events: number | string | bigint | null;
+  completed_events: number | string | bigint | null;
+  status_counts: unknown;
+  category_counts: unknown;
+  region_counts: unknown;
+}
 
 export function rowToEvent(r: LegacySourcingEventRow): SourcingEvent {
   return {
@@ -108,6 +131,102 @@ function rowToRequestUpdate(r: RequestUpdateRow): RequestUpdate {
   };
 }
 
+function asArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function isStatus(value: unknown): value is Status {
+  return typeof value === 'string' && STATUSES.includes(value as Status);
+}
+
+function isRegion(value: unknown): value is Region {
+  return typeof value === 'string' && REGIONS.includes(value as Region);
+}
+
+function mapStatusBuckets(value: unknown): DashboardSummary['statusBuckets'] {
+  const buckets = new Map<Status, DashboardSummary['statusBuckets'][number]>(
+    STATUSES.map((status) => [status, { status, count: 0, sourced: 0 }] as const),
+  );
+
+  for (const item of asArray(value)) {
+    const record = asRecord(item);
+    if (!record || !isStatus(record.status)) continue;
+    buckets.set(record.status, {
+      status: record.status,
+      count: num(record.count ?? record.event_count),
+      sourced: num(record.sourced),
+    });
+  }
+
+  return STATUSES.map((status) => buckets.get(status)!);
+}
+
+function mapCategoryCounts(value: unknown): DashboardSummary['categoryCounts'] {
+  return asArray(value)
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record || typeof record.category !== 'string') return null;
+      return {
+        category: record.category,
+        count: num(record.count ?? record.event_count),
+        sourced: num(record.sourced),
+      };
+    })
+    .filter((item): item is DashboardSummary['categoryCounts'][number] => item !== null);
+}
+
+function mapRegionCounts(value: unknown): DashboardSummary['regionCounts'] {
+  return asArray(value)
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record || !isRegion(record.region)) return null;
+      return {
+        region: record.region,
+        count: num(record.count ?? record.event_count),
+        sourced: num(record.sourced),
+      };
+    })
+    .filter((item): item is DashboardSummary['regionCounts'][number] => item !== null);
+}
+
+export function mapDashboardSummaryRow(row: DashboardSummaryRpcRow): DashboardSummary {
+  const sourced = num(row.total_sourced);
+  const savings = num(row.total_savings);
+  const addressable = num(row.total_addressable);
+
+  return {
+    totals: {
+      events: num(row.total_events),
+      live: num(row.live_events),
+      done: num(row.completed_events),
+      addressable,
+      sourced,
+      savings,
+      coverage: addressable > 0 ? Math.min(1, sourced / addressable) : 0,
+      savingsRate: sourced > 0 ? savings / sourced : 0,
+    },
+    statusBuckets: mapStatusBuckets(row.status_counts),
+    categoryCounts: mapCategoryCounts(row.category_counts),
+    regionCounts: mapRegionCounts(row.region_counts),
+  };
+}
+
+const emptyToNull = <T>(values: T[]): T[] | null => (values.length ? values : null);
+
 // ---- CRUD ------------------------------------------------------------------
 export async function listEvents(): Promise<SourcingEvent[]> {
   const { data, error } = await supabase
@@ -116,7 +235,32 @@ export async function listEvents(): Promise<SourcingEvent[]> {
     .order('start_date', { ascending: false });
   if (error) throw error;
   const events = (data ?? []).map(rowToEvent);
-  return events.length ? events : generateEvents();
+  return eventsOrDemoFallback(events);
+}
+
+export async function listDashboardSummary(filters: {
+  fys: FY[];
+  regions: Region[];
+  categories: string[];
+  subcategories: string[];
+  types: DashboardSummaryFunction['Args']['filter_types'];
+}): Promise<DashboardSummary> {
+  const { data, error } = await supabase
+    .rpc('dashboard_summary', {
+      filter_fys: emptyToNull(filters.fys),
+      filter_statuses: null,
+      filter_categories: emptyToNull(filters.categories),
+      filter_regions: emptyToNull(filters.regions),
+      filter_subcategories: emptyToNull(filters.subcategories),
+      filter_types: filters.types && filters.types.length ? filters.types : null,
+      filter_requestor_id: null,
+      filter_created_from: null,
+      filter_created_to: null,
+    })
+    .single();
+
+  if (error) throw error;
+  return mapDashboardSummaryRow(data as DashboardSummaryRpcRow);
 }
 
 export async function insertEvent(e: SourcingEvent, requestorId: string | null) {

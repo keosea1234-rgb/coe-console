@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../domain/store';
 import { useSession } from '../domain/session';
+import { isDemoModeEnabled, listDashboardSummary } from '../domain/repository';
 import {
   applyFilters,
   computeTotals,
+  totalsFromDashboardSummary,
   coverageByCategory,
   regionPerformance,
   pipelineByStatus,
@@ -13,6 +15,7 @@ import {
   regionCoverageDetail,
   deepDive,
   myRequestEvents,
+  type DashboardSummary,
   type DeepDive,
 } from '../domain/selectors';
 import { REGIONS } from '../domain/constants';
@@ -41,9 +44,14 @@ export function ConsolePage() {
   const { events, filters, baseline, loading, error, clearError } = useStore();
   const user = useSession((s) => s.user);
   const isAdmin = user?.role === 'admin';
+  const demoMode = isDemoModeEnabled();
   const [tab, setTab] = useState<ConsoleTab>('exec');
   const [reportsOpen, setReportsOpen] = useState(false);
   const [dive, setDive] = useState<DeepDive | null>(null);
+  const [dashboardSummaryState, setDashboardSummaryState] = useState<{
+    key: string;
+    summary: DashboardSummary;
+  } | null>(null);
 
   // If a user lands on an admin-only tab (e.g., after sign-out/in), bounce them back.
   useEffect(() => {
@@ -58,11 +66,49 @@ export function ConsolePage() {
     return () => window.clearTimeout(t);
   }, [error, clearError]);
 
+  const summaryKey = useMemo(() => JSON.stringify(filters), [filters]);
+
+  useEffect(() => {
+    if (demoMode) {
+      setDashboardSummaryState(null);
+      return;
+    }
+
+    let active = true;
+    setDashboardSummaryState((current) => (current?.key === summaryKey ? current : null));
+
+    void listDashboardSummary(filters)
+      .then((summary) => {
+        if (active) setDashboardSummaryState({ key: summaryKey, summary });
+      })
+      .catch((err) => {
+        console.warn('[dashboard] server summary unavailable; falling back to client selectors', err);
+        if (active) setDashboardSummaryState(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [demoMode, filters, summaryKey]);
+
+  const dashboardSummary =
+    !demoMode && dashboardSummaryState?.key === summaryKey ? dashboardSummaryState.summary : null;
+
   const filtered = useMemo(() => applyFilters(events, filters), [events, filters]);
-  const totals = useMemo(() => computeTotals(filtered, filters, baseline), [filtered, filters, baseline]);
+  const clientTotals = useMemo(() => computeTotals(filtered, filters, baseline), [filtered, filters, baseline]);
+  const totals = useMemo(
+    () =>
+      dashboardSummary
+        ? totalsFromDashboardSummary(dashboardSummary, clientTotals)
+        : clientTotals,
+    [dashboardSummary, clientTotals],
+  );
   const catCoverage = useMemo(() => coverageByCategory(filtered, filters, baseline), [filtered, filters, baseline]);
   const regionPerf = useMemo(() => regionPerformance(filtered, filters, baseline), [filtered, filters, baseline]);
-  const pipeline = useMemo(() => pipelineByStatus(filtered), [filtered]);
+  const pipeline = useMemo(
+    () => dashboardSummary?.statusBuckets ?? pipelineByStatus(filtered),
+    [dashboardSummary, filtered],
+  );
   const trend = useMemo(() => savingsTrend(filtered), [filtered]);
   const insights = useMemo(() => buildInsights(filtered, filters, baseline), [filtered, filters, baseline]);
   const matrix = useMemo(() => coverageMatrix(filtered, filters, baseline), [filtered, filters, baseline]);
@@ -95,7 +141,7 @@ export function ConsolePage() {
         pendingRequests={pendingRequests}
         myRequests={myRequests.length}
       />
-      {tab !== 'templatesLearning' && <FilterBar />}
+      {tab !== 'templatesLearning' && <FilterBar summary={totals} />}
 
       <div className="app-content fade-up">
         {error && (
@@ -216,7 +262,8 @@ export function ConsolePage() {
           fontFamily: theme.mono,
         }}
       >
-        eSourcing CoE Console - synthetic baseline data - coverage = sourced / addressable
+        eSourcing CoE Console - coverage = sourced / addressable
+        {demoMode ? ' - demo data mode enabled' : ''}
       </footer>
     </div>
   );

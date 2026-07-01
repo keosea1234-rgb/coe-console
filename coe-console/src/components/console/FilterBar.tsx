@@ -9,12 +9,13 @@ import {
   fmtUSD,
   fmtPct,
   fmtNum,
+  type Totals,
 } from '../../domain/selectors';
 import { Chip } from '../common/primitives';
 
 type MenuKey = 'fy' | 'category' | 'subcategory' | null;
 
-export function FilterBar() {
+export function FilterBar({ summary: summaryOverride }: { summary?: Totals }) {
   const {
     filters,
     events,
@@ -28,10 +29,11 @@ export function FilterBar() {
   } = useStore();
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
 
-  const summary = useMemo(() => {
+  const computedSummary = useMemo(() => {
     const filtered = applyFilters(events, filters);
     return computeTotals(filtered, filters, baseline);
   }, [events, filters, baseline]);
+  const summary = summaryOverride ?? computedSummary;
 
   const subcategoryOptions = useMemo(() => {
     const cats = CATEGORIES.filter((category) => filters.categories.includes(category.name));

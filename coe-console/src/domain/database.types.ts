@@ -344,6 +344,30 @@ export type Database = {
         Args: { row_data: Json };
         Returns: string;
       };
+      dashboard_summary: {
+        Args: {
+          filter_fys?: FY[] | null;
+          filter_statuses?: Status[] | null;
+          filter_categories?: string[] | null;
+          filter_regions?: Region[] | null;
+          filter_subcategories?: string[] | null;
+          filter_types?: EventType[] | null;
+          filter_requestor_id?: string | null;
+          filter_created_from?: string | null;
+          filter_created_to?: string | null;
+        };
+        Returns: {
+          total_addressable: number | string;
+          total_sourced: number | string;
+          total_savings: number | string;
+          total_events: number | string;
+          live_events: number | string;
+          completed_events: number | string;
+          status_counts: Json;
+          category_counts: Json;
+          region_counts: Json;
+        }[];
+      };
       is_admin: {
         Args: Record<string, never>;
         Returns: boolean;

@@ -120,6 +120,25 @@ export interface Totals {
   savingsRate: number; // 0..1 of sourced
 }
 
+export interface CategoryCountBucket {
+  category: string;
+  count: number;
+  sourced: number;
+}
+
+export interface RegionCountBucket {
+  region: Region;
+  count: number;
+  sourced: number;
+}
+
+export interface DashboardSummary {
+  totals: Totals;
+  statusBuckets: StatusBucket[];
+  categoryCounts: CategoryCountBucket[];
+  regionCounts: RegionCountBucket[];
+}
+
 function fyScope(f: Filters): FY[] {
   return f.fys.length ? f.fys : FYS;
 }
@@ -160,6 +179,23 @@ export function computeTotals(
     events: filtered.length,
     live: filtered.filter((e) => e.status === 'Live').length,
     done: filtered.filter((e) => e.status === 'Completed').length,
+    addressable,
+    sourced,
+    savings,
+    coverage: addressable > 0 ? Math.min(1, sourced / addressable) : 0,
+    savingsRate: sourced > 0 ? savings / sourced : 0,
+  };
+}
+
+export function totalsFromDashboardSummary(summary: DashboardSummary, fallback: Totals): Totals {
+  const addressable = summary.totals.addressable > 0 ? summary.totals.addressable : fallback.addressable;
+  const sourced = summary.totals.sourced;
+  const savings = summary.totals.savings;
+
+  return {
+    events: summary.totals.events,
+    live: summary.totals.live,
+    done: summary.totals.done,
     addressable,
     sourced,
     savings,
