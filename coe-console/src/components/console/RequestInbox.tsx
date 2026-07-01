@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSession, type SessionUser } from '../../domain/session';
 import { theme, sectionLabel } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
-import type { FeedbackResponse, SourcingEvent } from '../../domain/types';
+import type { FeedbackResponse, RequestUpdate, SourcingEvent } from '../../domain/types';
 import { fmtUSD } from '../../domain/selectors';
 import { STATUSES, type Status } from '../../domain/constants';
 import { useStore } from '../../domain/store';
 import { Button, StatusBadge } from '../common/primitives';
-import { SlideOver } from '../common/overlays';
 import { CATEGORY_BY_NAME } from '../../domain/categories';
 import { canEmailFeedback, openFeedbackEmail } from '../../lib/feedbackEmail';
-import { openRequestorReplyEmail, scopeLine } from '../../lib/coeRequestEmail';
+import { scopeLine } from '../../lib/coeRequestEmail';
+import { RequestConversation } from './RequestConversation';
 import {
   createAttachmentDownloadUrl,
   listAttachmentsForEvents,
@@ -237,6 +238,9 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   const feedbackResponses = useStore((s) => s.feedbackResponses);
   const archiveEvent = useStore((s) => s.archiveEvent);
   const unarchiveEvent = useStore((s) => s.unarchiveEvent);
+  const requestUpdates = useStore((s) => s.requestUpdates);
+  const addRequestUpdate = useStore((s) => s.addRequestUpdate);
+  const currentUser = useSession((s) => s.user);
   const [filter, setFilter] = useState<'active' | 'new' | 'archived' | 'all'>('active');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [attachmentsByEvent, setAttachmentsByEvent] = useState<Record<string, AttachmentRow[]>>({});
@@ -269,6 +273,10 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
   // Resolve the open row against live data so the panel reflects status/archive
   // changes made while it is open.
   const detailEvent = selectedId ? events.find((e) => e.id === selectedId) ?? null : null;
+  const detailUpdates = useMemo(
+    () => (detailEvent ? requestUpdates.filter((update) => update.eventId === detailEvent.id) : []),
+    [detailEvent, requestUpdates],
+  );
 
   useEffect(() => {
     const eventIds = requests.map((event) => event.id);
@@ -339,9 +347,40 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
     }
   };
 
+  if (detailEvent) {
+    return (
+      <RequestInboxWorkspace
+        event={detailEvent}
+        onBack={() => setSelectedId(null)}
+        attachments={attachmentsByEvent[detailEvent.id]}
+        attachmentLoadError={attachmentLoadError}
+        downloadUrls={attachmentDownloadUrls}
+        downloadUrlError={downloadUrlError}
+        downloadingId={downloadingAttachmentId}
+        onDownload={(attachment) => void downloadAttachment(attachment)}
+        feedbackResponse={feedbackResponses.find((response) => response.eventId === detailEvent.id)}
+        onRequestFeedback={(event) => {
+          if (openFeedbackEmail(event)) void requestEventFeedback(event.id);
+        }}
+        onStatusChange={(id, status) => updateEventStatus(id, status)}
+        onArchive={(id) => void archiveEvent(id)}
+        onUnarchive={(id) => void unarchiveEvent(id)}
+        updates={detailUpdates}
+        currentUser={currentUser}
+        onPostUpdate={(eventId, body) => addRequestUpdate({ eventId, body })}
+      />
+    );
+  }
+
   return (
-    <>
-    <Card pad={0}>
+    <Card
+      pad={0}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 'clamp(520px, calc(100vh - 220px), 680px)',
+      }}
+    >
       <div
         style={{
           padding: '16px 18px 12px',
@@ -415,7 +454,7 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto', maxHeight: 600 }}>
+      <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1280 }}>
           <thead>
             <tr>
@@ -612,30 +651,6 @@ export function RequestInbox({ events }: { events: SourcingEvent[] }) {
         </table>
       </div>
     </Card>
-
-      <RequestInboxDetail
-        key={detailEvent?.id ?? 'none'}
-        event={detailEvent}
-        onClose={() => setSelectedId(null)}
-        attachments={detailEvent ? attachmentsByEvent[detailEvent.id] : undefined}
-        attachmentLoadError={attachmentLoadError}
-        downloadUrls={attachmentDownloadUrls}
-        downloadUrlError={downloadUrlError}
-        downloadingId={downloadingAttachmentId}
-        onDownload={(attachment) => void downloadAttachment(attachment)}
-        feedbackResponse={
-          detailEvent
-            ? feedbackResponses.find((response) => response.eventId === detailEvent.id)
-            : undefined
-        }
-        onRequestFeedback={(event) => {
-          if (openFeedbackEmail(event)) void requestEventFeedback(event.id);
-        }}
-        onStatusChange={(id, status) => updateEventStatus(id, status)}
-        onArchive={(id) => void archiveEvent(id)}
-        onUnarchive={(id) => void unarchiveEvent(id)}
-      />
-    </>
   );
 }
 
@@ -656,9 +671,9 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-function RequestInboxDetail({
+function RequestInboxWorkspace({
   event,
-  onClose,
+  onBack,
   attachments,
   attachmentLoadError,
   downloadUrls,
@@ -670,9 +685,12 @@ function RequestInboxDetail({
   onStatusChange,
   onArchive,
   onUnarchive,
+  updates,
+  currentUser,
+  onPostUpdate,
 }: {
-  event: SourcingEvent | null;
-  onClose: () => void;
+  event: SourcingEvent;
+  onBack: () => void;
   attachments?: AttachmentRow[];
   attachmentLoadError: string | null;
   downloadUrls: Record<string, string>;
@@ -684,10 +702,10 @@ function RequestInboxDetail({
   onStatusChange: (id: string, status: Status) => void;
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
+  updates: RequestUpdate[];
+  currentUser: SessionUser | null;
+  onPostUpdate: (eventId: string, body: string) => Promise<{ error: string | null }>;
 }) {
-  const [reply, setReply] = useState('');
-
-  if (!event) return null;
   const cat = CATEGORY_BY_NAME[event.category];
   const badges = [
     event.directness,
@@ -697,57 +715,41 @@ function RequestInboxDetail({
   ].filter(Boolean) as string[];
 
   return (
-    <SlideOver
-      open={!!event}
-      onClose={onClose}
-      width={480}
-      title={
-        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span
-            style={{ width: 8, height: 8, borderRadius: 2, background: cat?.color ?? theme.primary, flexShrink: 0 }}
-          />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: theme.ink, lineHeight: 1.2 }}>{event.name}</div>
-            <div style={{ fontSize: 11, color: theme.textTertiary, fontFamily: theme.mono, marginTop: 2 }}>
-              {event.id}
+    <div style={{ display: 'grid', gap: 16 }}>
+      <Card pad={0}>
+        <div
+          style={{
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 14,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <Button variant="ghost" onClick={onBack} style={{ height: 30, padding: '6px 10px', fontSize: 12 }}>
+              Back
+            </Button>
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 3,
+                background: cat?.color ?? theme.primary,
+                flexShrink: 0,
+              }}
+            />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 17, fontWeight: 850, color: theme.ink, lineHeight: 1.2 }}>
+                {event.name}
+              </div>
+              <div style={{ marginTop: 3, fontSize: 11.5, color: theme.textTertiary, fontFamily: theme.mono }}>
+                {event.id} / {fmtReceivedAt(event.requestCreatedAt)}
+              </div>
             </div>
           </div>
-        </div>
-      }
-    >
-      <div style={{ padding: '16px 18px', display: 'grid', gap: 16 }}>
-        <div>
-          <DetailRow label="Requestor" value={event.requestor ?? '-'} />
-          <DetailRow label="Received" value={fmtReceivedAt(event.requestCreatedAt)} />
-          <DetailRow label="Scope" value={scopeLine(event)} />
-          <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
-          <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
-          {badges.length > 0 && (
-            <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {badges.map((badge) => (
-                <span
-                  key={badge}
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 800,
-                    fontFamily: theme.mono,
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    color: theme.textSecondary,
-                    background: theme.surfaceMuted,
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  {badge}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={sectionLabel}>Status</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <StatusBadge status={event.status} />
             <select
               className="ui-select"
@@ -762,60 +764,8 @@ function RequestInboxDetail({
                 </option>
               ))}
             </select>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={sectionLabel}>Attachments</div>
-          <AttachmentsCell
-            attachments={attachments}
-            error={attachmentLoadError}
-            downloadUrls={downloadUrls}
-            downloadUrlError={downloadUrlError}
-            downloadingId={downloadingId}
-            onDownload={onDownload}
-          />
-        </div>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={sectionLabel}>Feedback</div>
-          <FeedbackCell event={event} response={feedbackResponse} onRequest={() => onRequestFeedback(event)} />
-        </div>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={sectionLabel}>Reply to requestor</div>
-          <p style={{ margin: 0, fontSize: 12, color: theme.textSecondary, lineHeight: 1.45 }}>
-            Send an update to {event.requestor ?? 'the requestor'}. We'll prefill the request context and open
-            your email client.
-          </p>
-          <textarea
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            rows={5}
-            placeholder="e.g. Picked up - kicking off supplier shortlist this week. Will share the bid template by Friday."
-            style={{
-              width: '100%',
-              resize: 'vertical',
-              borderRadius: theme.radiusSm,
-              border: `1px solid ${theme.borderStrong}`,
-              background: theme.surface,
-              color: theme.ink,
-              padding: '10px 12px',
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              fontFamily: 'inherit',
-            }}
-          />
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button
-              variant="primary"
-              disabled={!event.requestor?.includes('@')}
-              onClick={() => openRequestorReplyEmail(event, reply)}
-            >
-              Send reply
-            </Button>
             {event.archivedAt ? (
-              <Button variant="secondary" onClick={() => onUnarchive(event.id)}>
+              <Button variant="secondary" onClick={() => onUnarchive(event.id)} style={{ height: 32 }}>
                 Restore
               </Button>
             ) : (
@@ -827,13 +777,76 @@ function RequestInboxDetail({
                   );
                   if (ok) onArchive(event.id);
                 }}
+                style={{ height: 32 }}
               >
                 Archive
               </Button>
             )}
           </div>
         </div>
+      </Card>
+
+      <div className="request-workspace-grid">
+        <Card pad={0} style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '16px 18px', borderBottom: `1px solid ${theme.border}` }}>
+            <CardTitle sub={event.requestor ?? 'No requestor email'}>Request details</CardTitle>
+          </div>
+          <div style={{ padding: '4px 18px 18px', display: 'grid', gap: 16 }}>
+            <div>
+              <DetailRow label="Requestor" value={event.requestor ?? '-'} />
+              <DetailRow label="Scope" value={scopeLine(event)} />
+              <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
+              <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
+              {badges.length > 0 && (
+                <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {badges.map((badge) => (
+                    <span
+                      key={badge}
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        fontFamily: theme.mono,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        color: theme.textSecondary,
+                        background: theme.surfaceMuted,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={sectionLabel}>Attachments</div>
+              <AttachmentsCell
+                attachments={attachments}
+                error={attachmentLoadError}
+                downloadUrls={downloadUrls}
+                downloadUrlError={downloadUrlError}
+                downloadingId={downloadingId}
+                onDownload={onDownload}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={sectionLabel}>Feedback</div>
+              <FeedbackCell event={event} response={feedbackResponse} onRequest={() => onRequestFeedback(event)} />
+            </div>
+          </div>
+        </Card>
+
+        <RequestConversation
+          event={event}
+          updates={updates}
+          currentUser={currentUser}
+          onPost={onPostUpdate}
+          style={{ minHeight: 'clamp(480px, calc(100vh - 284px), 700px)' }}
+        />
       </div>
-    </SlideOver>
+    </div>
   );
 }

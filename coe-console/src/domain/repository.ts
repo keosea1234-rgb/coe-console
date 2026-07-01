@@ -3,13 +3,15 @@ import type { FY, Region, Status } from './constants';
 import type { Database } from './database.types';
 import { generateEvents } from './generateEvents';
 import { baselineKey, type SpendBaseline } from './selectors';
-import type { FeedbackResponse, SourcingEvent } from './types';
+import type { FeedbackResponse, RequestUpdate, SourcingEvent } from './types';
 
 type SourcingEventRow = Database['public']['Tables']['sourcing_events']['Row'];
 type SourcingEventInsert = Database['public']['Tables']['sourcing_events']['Insert'];
 type SpendBaselineRow = Database['public']['Tables']['spend_baseline']['Row'];
 type FeedbackResponseRow = Database['public']['Tables']['feedback_responses']['Row'];
 type FeedbackResponseInsert = Database['public']['Tables']['feedback_responses']['Insert'];
+type RequestUpdateRow = Database['public']['Tables']['request_updates']['Row'];
+type RequestUpdateInsert = Database['public']['Tables']['request_updates']['Insert'];
 type LegacySourcingEventRow = Omit<SourcingEventRow, 'status'> & {
   status: SourcingEventRow['status'] | 'Awarded';
 };
@@ -91,6 +93,18 @@ function rowToFeedbackResponse(r: FeedbackResponseRow): FeedbackResponse {
     comment: r.comment ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+function rowToRequestUpdate(r: RequestUpdateRow): RequestUpdate {
+  return {
+    id: r.id,
+    eventId: r.event_id,
+    authorId: r.author_id,
+    authorEmail: r.author_email,
+    authorRole: r.author_role,
+    body: r.body,
+    createdAt: r.created_at,
   };
 }
 
@@ -233,4 +247,32 @@ export async function upsertFeedbackResponse(input: {
     .single();
   if (error) throw error;
   return rowToFeedbackResponse(data as FeedbackResponseRow);
+}
+
+export async function listRequestUpdates(): Promise<RequestUpdate[]> {
+  const { data, error } = await supabase
+    .from('request_updates')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data as RequestUpdateRow[]).map(rowToRequestUpdate);
+}
+
+export async function insertRequestUpdate(input: {
+  eventId: string;
+  authorId: string;
+  authorEmail: string;
+  authorRole: 'user' | 'admin';
+  body: string;
+}): Promise<RequestUpdate> {
+  const row: RequestUpdateInsert = {
+    event_id: input.eventId,
+    author_id: input.authorId,
+    author_email: input.authorEmail,
+    author_role: input.authorRole,
+    body: input.body,
+  };
+  const { data, error } = await supabase.from('request_updates').insert(row).select('*').single();
+  if (error) throw error;
+  return rowToRequestUpdate(data as RequestUpdateRow);
 }

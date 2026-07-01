@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { FY, Region, Status } from './constants';
 import type { Filters, SpendBaseline } from './selectors';
-import type { FeedbackResponse, SourcingEvent } from './types';
+import type { FeedbackResponse, RequestUpdate, SourcingEvent } from './types';
 
 export interface ClientDataState {
   filters: Filters;
@@ -25,6 +25,8 @@ export interface ServerDataState {
   baselineLoading: boolean;
   feedbackResponses: FeedbackResponse[];
   feedbackLoading: boolean;
+  requestUpdates: RequestUpdate[];
+  requestUpdatesLoading: boolean;
 }
 
 export interface FeedbackInput {
@@ -44,6 +46,12 @@ export interface BaselineCellInput {
 export interface StoreUser {
   id: string;
   email: string;
+  role: 'user' | 'admin';
+}
+
+export interface RequestUpdateInput {
+  eventId: string;
+  body: string;
 }
 
 export interface ConsoleRepository {
@@ -58,6 +66,14 @@ export interface ConsoleRepository {
   upsertFeedbackResponse: (
     input: FeedbackInput & { requestorId: string; requestorEmail: string },
   ) => Promise<FeedbackResponse>;
+  listRequestUpdates: () => Promise<RequestUpdate[]>;
+  insertRequestUpdate: (
+    input: RequestUpdateInput & {
+      authorId: string;
+      authorEmail: string;
+      authorRole: 'user' | 'admin';
+    },
+  ) => Promise<RequestUpdate>;
   listBaseline: () => Promise<SpendBaseline>;
   upsertBaselineCell: (fy: FY, category: string, region: Region, value: number) => Promise<void>;
   deleteBaselineCell: (fy: FY, category: string, region: Region) => Promise<void>;
@@ -82,6 +98,8 @@ export interface ServerActions {
   requestEventFeedback: (id: string) => Promise<void>;
   refreshFeedbackResponses: () => Promise<void>;
   submitFeedbackResponse: (input: FeedbackInput) => Promise<{ error: string | null }>;
+  refreshRequestUpdates: () => Promise<void>;
+  addRequestUpdate: (input: RequestUpdateInput) => Promise<{ error: string | null }>;
   refreshBaseline: () => Promise<void>;
   setBaselineCell: (fy: FY, category: string, region: Region, value: number) => Promise<void>;
   prefillBaseline: () => Promise<void>;

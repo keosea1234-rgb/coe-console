@@ -35,6 +35,7 @@ import { SubcategoryDeepDive } from '../components/console/SubcategoryDeepDive';
 import { WeeklyReports } from '../components/console/WeeklyReports';
 import { RequestInbox } from '../components/console/RequestInbox';
 import { MyRequests } from '../components/console/MyRequests';
+import { TemplatesLearningTab } from '../components/console/TemplatesLearningTab';
 
 export function ConsolePage() {
   const { events, filters, baseline, loading, error, clearError } = useStore();
@@ -94,7 +95,7 @@ export function ConsolePage() {
         pendingRequests={pendingRequests}
         myRequests={myRequests.length}
       />
-      <FilterBar />
+      {tab !== 'templatesLearning' && <FilterBar />}
 
       <div className="app-content fade-up">
         {error && (
@@ -135,7 +136,7 @@ export function ConsolePage() {
           </div>
         )}
 
-        {loading ? (
+        {loading && tab !== 'templatesLearning' ? (
           <div
             style={{
               display: 'grid',
@@ -194,6 +195,8 @@ export function ConsolePage() {
             {tab === 'inbox' && isAdmin && <RequestInbox events={events} />}
 
             {tab === 'myRequests' && !isAdmin && <MyRequests events={events} user={user} />}
+
+            {tab === 'templatesLearning' && <TemplatesLearningTab />}
           </>
         )}
       </div>

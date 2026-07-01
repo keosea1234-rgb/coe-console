@@ -47,3 +47,13 @@ export interface FeedbackResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface RequestUpdate {
+  id: string;
+  eventId: string;
+  authorId: string;
+  authorEmail: string;
+  authorRole: 'user' | 'admin';
+  body: string;
+  createdAt: string;
+}

@@ -186,6 +186,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      request_updates: {
+        Row: {
+          id: string;
+          event_id: string;
+          author_id: string;
+          author_email: string;
+          author_role: 'user' | 'admin';
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          author_id: string;
+          author_email: string;
+          author_role: 'user' | 'admin';
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          author_id?: string;
+          author_email?: string;
+          author_role?: 'user' | 'admin';
+          body?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       sourcing_events: {
         Row: {
           id: string;

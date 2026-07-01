@@ -4,7 +4,7 @@ import { SegmentedControl } from '../common/primitives';
 import { IconReport } from './icons';
 import { useSession } from '../../domain/session';
 
-export type ConsoleTab = 'exec' | 'coverageMap' | 'ops' | 'myRequests' | 'spend' | 'inbox';
+export type ConsoleTab = 'exec' | 'coverageMap' | 'ops' | 'templatesLearning' | 'myRequests' | 'spend' | 'inbox';
 
 export function TopBar({
   tab,
@@ -27,6 +27,7 @@ export function TopBar({
     { value: 'exec', label: 'Exec overview' },
     { value: 'coverageMap', label: 'Coverage map' },
     { value: 'ops', label: 'Operational console' },
+    { value: 'templatesLearning', label: 'Templates & Learning' },
   ];
   const userTabs: { value: ConsoleTab; label: string }[] = !isAdmin
     ? [

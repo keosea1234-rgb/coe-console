@@ -6,7 +6,7 @@ import type {
   ConsoleRepository,
   StoreUser,
 } from '../src/domain/storeTypes';
-import type { FeedbackResponse, SourcingEvent } from '../src/domain/types';
+import type { FeedbackResponse, RequestUpdate, SourcingEvent } from '../src/domain/types';
 import type { SpendBaseline } from '../src/domain/selectors';
 
 function requestEvent(id = 'EVT-FY26-0100'): SourcingEvent {
@@ -35,6 +35,7 @@ function requestEvent(id = 'EVT-FY26-0100'): SourcingEvent {
 function createMemoryRepository() {
   const events: SourcingEvent[] = [];
   const feedbackResponses: FeedbackResponse[] = [];
+  const requestUpdates: RequestUpdate[] = [];
   const baseline: SpendBaseline = {};
   const calls: Array<{ name: string; args: unknown[] }> = [];
 
@@ -86,6 +87,21 @@ function createMemoryRepository() {
       feedbackResponses.unshift(response);
       return response;
     },
+    listRequestUpdates: async () => requestUpdates,
+    insertRequestUpdate: async (input) => {
+      calls.push({ name: 'insertRequestUpdate', args: [input.eventId, input.authorId, input.authorRole] });
+      const update: RequestUpdate = {
+        id: `upd-${requestUpdates.length + 1}`,
+        eventId: input.eventId,
+        authorId: input.authorId,
+        authorEmail: input.authorEmail,
+        authorRole: input.authorRole,
+        body: input.body,
+        createdAt: '2026-06-28T12:10:00.000Z',
+      };
+      requestUpdates.push(update);
+      return update;
+    },
     listBaseline: async () => baseline,
     upsertBaselineCell: async (fy, category, region, value) => {
       calls.push({ name: 'upsertBaselineCell', args: [fy, category, region, value] });
@@ -110,8 +126,8 @@ function createMemoryRepository() {
 
 test('request intake, admin workflow, and buyer feedback stay in sync', async () => {
   const { repository, calls } = createMemoryRepository();
-  const buyer: StoreUser = { id: 'buyer-1', email: 'buyer@amcor.com' };
-  const admin: StoreUser = { id: 'admin-1', email: 'admin@amcor.com' };
+  const buyer: StoreUser = { id: 'buyer-1', email: 'buyer@amcor.com', role: 'user' };
+  const admin: StoreUser = { id: 'admin-1', email: 'admin@amcor.com', role: 'admin' };
   let currentUser: StoreUser | null = buyer;
 
   const store = createConsoleStore({
@@ -164,6 +180,19 @@ test('request intake, admin workflow, and buyer feedback stay in sync', async ()
     created.id,
     buyer.id,
   ]);
+
+  const updateResult = await store.getState().addRequestUpdate({
+    eventId: created.id,
+    body: 'Can we add APAC scope to this request?',
+  });
+
+  assert.equal(updateResult.error, null);
+  assert.equal(store.getState().requestUpdates[0]?.body, 'Can we add APAC scope to this request?');
+  assert.deepEqual(calls.find((call) => call.name === 'insertRequestUpdate')?.args, [
+    created.id,
+    buyer.id,
+    'user',
+  ]);
 });
 
 test('optimistic status update rolls back when repository mutation fails', async () => {
@@ -176,7 +205,7 @@ test('optimistic status update rolls back when repository mutation fails', async
         throw new Error('database unavailable');
       },
     },
-    getCurrentUser: () => ({ id: 'admin-1', email: 'admin@amcor.com' }),
+    getCurrentUser: () => ({ id: 'admin-1', email: 'admin@amcor.com', role: 'admin' }),
     now: () => '2026-06-28T12:00:00.000Z',
   });
 
@@ -203,7 +232,7 @@ test('addEvent rolls back and rejects when repository insert fails', async () =>
         throw new Error('insert failed');
       },
     },
-    getCurrentUser: () => ({ id: 'buyer-1', email: 'buyer@amcor.com' }),
+    getCurrentUser: () => ({ id: 'buyer-1', email: 'buyer@amcor.com', role: 'user' }),
     now: () => '2026-06-28T12:00:00.000Z',
   });
 

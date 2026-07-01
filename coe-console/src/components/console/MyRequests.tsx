@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { CATEGORY_BY_NAME } from '../../domain/categories';
 import { fmtUSD, myRequestEvents } from '../../domain/selectors';
 import type { SessionUser } from '../../domain/session';
-import type { SourcingEvent } from '../../domain/types';
+import { useStore } from '../../domain/store';
+import type { RequestUpdate, SourcingEvent } from '../../domain/types';
 import { theme, numeric, sectionLabel } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import { Button, StatusBadge } from '../common/primitives';
-import { SlideOver } from '../common/overlays';
-import { COE_INBOX_EMAIL, openCoeRequestEmail } from '../../lib/coeRequestEmail';
+import { RequestConversation } from './RequestConversation';
 
 const th: React.CSSProperties = {
   textAlign: 'left',
@@ -92,16 +92,35 @@ export function MyRequests({
   user,
 }: {
   events: SourcingEvent[];
-  user: Pick<SessionUser, 'id' | 'email'> | null;
+  user: SessionUser | null;
 }) {
-  const [selected, setSelected] = useState<SourcingEvent | null>(null);
+  const requestUpdates = useStore((s) => s.requestUpdates);
+  const addRequestUpdate = useStore((s) => s.addRequestUpdate);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const requests = useMemo(() => myRequestEvents(events, user), [events, user]);
   const visible = requests;
+  const detailEvent = selectedId ? requests.find((event) => event.id === selectedId) ?? null : null;
+  const detailUpdates = useMemo(
+    () => (detailEvent ? requestUpdates.filter((update) => update.eventId === detailEvent.id) : []),
+    [detailEvent, requestUpdates],
+  );
 
   const openCount = requests.filter((event) => !event.archivedAt && event.status === 'Planned').length;
   const managedCount = requests.filter((event) => !!event.archivedAt || event.status !== 'Planned').length;
   const completedCount = requests.filter((event) => event.status === 'Completed').length;
   const pipeline = requests.reduce((sum, event) => sum + event.addressable, 0);
+
+  if (detailEvent) {
+    return (
+      <MyRequestWorkspace
+        event={detailEvent}
+        updates={detailUpdates}
+        currentUser={user}
+        onBack={() => setSelectedId(null)}
+        onPostUpdate={(eventId, body) => addRequestUpdate({ eventId, body })}
+      />
+    );
+  }
 
   return (
     <>
@@ -169,7 +188,7 @@ export function MyRequests({
                   return (
                     <tr
                       key={event.id}
-                      onClick={() => setSelected(event)}
+                      onClick={() => setSelectedId(event.id)}
                       title="Open request"
                       style={{ cursor: 'pointer' }}
                       className="my-request-row"
@@ -268,7 +287,6 @@ export function MyRequests({
         </div>
       )}
 
-      <RequestDetail key={selected?.id ?? 'none'} event={selected} onClose={() => setSelected(null)} />
     </>
   );
 }
@@ -290,108 +308,112 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-function RequestDetail({ event, onClose }: { event: SourcingEvent | null; onClose: () => void }) {
-  const [message, setMessage] = useState('');
-
-  if (!event) return null;
+function MyRequestWorkspace({
+  event,
+  updates,
+  currentUser,
+  onBack,
+  onPostUpdate,
+}: {
+  event: SourcingEvent;
+  updates: RequestUpdate[];
+  currentUser: SessionUser | null;
+  onBack: () => void;
+  onPostUpdate: (eventId: string, body: string) => Promise<{ error: string | null }>;
+}) {
   const badges = requestBadges(event);
 
   return (
-    <SlideOver
-      open={!!event}
-      onClose={onClose}
-      width={460}
-      title={
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: theme.ink, lineHeight: 1.2 }}>{event.name}</div>
-          <div style={{ fontSize: 11, color: theme.textTertiary, fontFamily: theme.mono, marginTop: 2 }}>
-            {event.id}
+    <div style={{ display: 'grid', gap: 16 }}>
+      <Card pad={0}>
+        <div
+          style={{
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 14,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <Button variant="ghost" onClick={onBack} style={{ height: 30, padding: '6px 10px', fontSize: 12 }}>
+              Back
+            </Button>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 17, fontWeight: 850, color: theme.ink, lineHeight: 1.2 }}>
+                {event.name}
+              </div>
+              <div style={{ marginTop: 3, fontSize: 11.5, color: theme.textTertiary, fontFamily: theme.mono }}>
+                {event.id} / {fmtSubmittedAt(event.requestCreatedAt)}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <StatusBadge status={event.status} />
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                minHeight: 26,
+                padding: '3px 8px',
+                borderRadius: 6,
+                background: event.archivedAt ? theme.surfaceMuted : theme.infoBg,
+                color: event.archivedAt ? theme.textTertiary : theme.info,
+                fontSize: 11.5,
+                fontWeight: 800,
+                fontFamily: theme.mono,
+              }}
+            >
+              {followUpLabel(event)}
+            </span>
           </div>
         </div>
-      }
-    >
-      <div style={{ padding: '16px 18px', display: 'grid', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <StatusBadge status={event.status} />
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '3px 8px',
-              borderRadius: 6,
-              background: event.archivedAt ? theme.surfaceMuted : theme.infoBg,
-              color: event.archivedAt ? theme.textTertiary : theme.info,
-              fontSize: 11.5,
-              fontWeight: 800,
-              fontFamily: theme.mono,
-            }}
-          >
-            {followUpLabel(event)}
-          </span>
-        </div>
+      </Card>
 
-        <div>
-          <DetailRow label="Submitted" value={fmtSubmittedAt(event.requestCreatedAt)} />
-          <DetailRow label="Scope" value={scopeText(event)} />
-          <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
-          <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
-          <DetailRow label="Requestor" value={event.requestor ?? '-'} />
-          {badges.length > 0 && (
-            <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {badges.map((badge) => (
-                <span
-                  key={badge}
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 800,
-                    fontFamily: theme.mono,
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    color: theme.textSecondary,
-                    background: theme.surfaceMuted,
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  {badge}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="request-workspace-grid">
+        <Card pad={0} style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '16px 18px', borderBottom: `1px solid ${theme.border}` }}>
+            <CardTitle sub={followUpLabel(event)}>Request details</CardTitle>
+          </div>
+          <div style={{ padding: '4px 18px 18px' }}>
+            <DetailRow label="Submitted" value={fmtSubmittedAt(event.requestCreatedAt)} />
+            <DetailRow label="Scope" value={scopeText(event)} />
+            <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
+            <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
+            <DetailRow label="Requestor" value={event.requestor ?? '-'} />
+            {badges.length > 0 && (
+              <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {badges.map((badge) => (
+                  <span
+                    key={badge}
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      fontFamily: theme.mono,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      color: theme.textSecondary,
+                      background: theme.surfaceMuted,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
 
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div style={sectionLabel}>Send a request to the CoE</div>
-          <p style={{ margin: 0, fontSize: 12, color: theme.textSecondary, lineHeight: 1.45 }}>
-            Ask the eSourcing CoE a question or request support for this event. We'll prefill the event
-            context and open your email to {COE_INBOX_EMAIL}.
-          </p>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={5}
-            placeholder="e.g. Please prioritise this event - supplier deadline moved up two weeks."
-            style={{
-              width: '100%',
-              resize: 'vertical',
-              borderRadius: theme.radiusSm,
-              border: `1px solid ${theme.borderStrong}`,
-              background: theme.surface,
-              color: theme.ink,
-              padding: '10px 12px',
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              fontFamily: 'inherit',
-            }}
-          />
-          <Button
-            variant="primary"
-            onClick={() => openCoeRequestEmail(event, message)}
-            style={{ alignSelf: 'flex-start' }}
-          >
-            Send to CoE
-          </Button>
-        </div>
+        <RequestConversation
+          event={event}
+          updates={updates}
+          currentUser={currentUser}
+          onPost={onPostUpdate}
+          style={{ minHeight: 'clamp(480px, calc(100vh - 284px), 700px)' }}
+        />
       </div>
-    </SlideOver>
+    </div>
   );
 }

@@ -19,6 +19,7 @@ useSession.subscribe((state, prev) => {
     void useStore.getState().refreshEvents();
     void useStore.getState().refreshBaseline();
     void useStore.getState().refreshFeedbackResponses();
+    void useStore.getState().refreshRequestUpdates();
   } else if (justLoggedOut) {
     useStore.setState(createInitialServerState());
   }

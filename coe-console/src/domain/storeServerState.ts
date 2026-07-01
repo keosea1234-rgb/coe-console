@@ -20,6 +20,8 @@ export function createInitialServerState(): ServerDataState {
     baselineLoading: true,
     feedbackResponses: [],
     feedbackLoading: true,
+    requestUpdates: [],
+    requestUpdatesLoading: true,
   };
 }
 
@@ -171,6 +173,61 @@ export function createServerStateSlice(
         console.error('[store] submitFeedbackResponse failed', err);
         const message = (err as Error).message;
         set({ error: message });
+        return { error: message };
+      }
+    },
+
+    refreshRequestUpdates: async () => {
+      set({ requestUpdatesLoading: true });
+      try {
+        const requestUpdates = await repository.listRequestUpdates();
+        set({ requestUpdates, requestUpdatesLoading: false });
+      } catch (err) {
+        console.error('[store] refreshRequestUpdates failed', err);
+        set({ requestUpdatesLoading: false, error: (err as Error).message });
+      }
+    },
+
+    addRequestUpdate: async ({ eventId, body }) => {
+      const user = getCurrentUser();
+      if (!user) return { error: 'Sign in before posting an update.' };
+
+      const trimmed = body.trim();
+      if (!trimmed) return { error: 'Write an update before posting.' };
+
+      const createdAt = now();
+      const tempId = `temp-${eventId}-${createdAt}`;
+      const optimistic = {
+        id: tempId,
+        eventId,
+        authorId: user.id,
+        authorEmail: user.email,
+        authorRole: user.role,
+        body: trimmed,
+        createdAt,
+      };
+
+      const prev = get().requestUpdates;
+      set({ requestUpdates: [...prev, optimistic] });
+
+      try {
+        const saved = await repository.insertRequestUpdate({
+          eventId,
+          body: trimmed,
+          authorId: user.id,
+          authorEmail: user.email,
+          authorRole: user.role,
+        });
+        set((state) => ({
+          requestUpdates: state.requestUpdates.map((update) =>
+            update.id === tempId ? saved : update,
+          ),
+        }));
+        return { error: null };
+      } catch (err) {
+        console.error('[store] insertRequestUpdate failed; reverting', err);
+        const message = (err as Error).message;
+        set({ requestUpdates: prev, error: message });
         return { error: message };
       }
     },
