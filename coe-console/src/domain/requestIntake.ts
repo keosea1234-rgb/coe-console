@@ -98,7 +98,7 @@ export function buildRequestEvent(input: RequestEventInput, createdAt: string): 
   const businessGroups = rows.map((row) => ({
     region: row.region,
     addressable: Math.round(row.spend),
-    sourced: Math.round(row.spend),
+    sourced: 0,
   }));
 
   return {
@@ -114,7 +114,7 @@ export function buildRequestEvent(input: RequestEventInput, createdAt: string): 
     eventTypes: input.eventTypes,
     status: input.status,
     addressable: Math.round(totalSpend),
-    sourced: Math.round(totalSpend),
+    sourced: 0,
     savings: 0,
     startDate: input.eventDate,
     requestor: input.requestorEmail.trim(),

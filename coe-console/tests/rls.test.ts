@@ -12,8 +12,7 @@
 //   SUPABASE_TEST_ADMIN_PASSWORD     That user's password
 //
 // Prepare the test project by running every migration in supabase/migrations
-// in order. Insert at least one seeded event so `archived_event_visibility`
-// has something to assert against.
+// in order. The tests create and clean up their own policy assertion rows.
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -78,6 +77,28 @@ async function insertOwnRequestEvent(client: SupabaseClient, user: { id: string;
   return eventId;
 }
 
+async function insertAdminEvent(client: SupabaseClient) {
+  const eventId = uniqueEventId('RLS-ADMIN-EVENT');
+  const { error } = await client.from('sourcing_events').insert({
+    id: eventId,
+    name: 'RLS admin-owned policy test',
+    fy: 'FY26',
+    category: 'Resins',
+    subcategory: 'PE',
+    region: 'NA',
+    regions: ['NA'],
+    type: 'RFQ',
+    event_types: ['RFQ'],
+    status: 'Planned',
+    addressable: 1,
+    sourced: 0,
+    savings: 0,
+    start_date: '2026-03-15',
+  });
+  assert.equal(error, null, `creating admin event failed: ${error?.message}`);
+  return eventId;
+}
+
 async function uploadTextAttachmentObject(client: SupabaseClient, eventId: string) {
   const path = `${eventId}/${randomUUID()}.txt`;
   const { error } = await client.storage
@@ -88,6 +109,29 @@ async function uploadTextAttachmentObject(client: SupabaseClient, eventId: strin
     });
   assert.equal(error, null, `storage upload failed: ${error?.message}`);
   return path;
+}
+
+async function insertAttachmentMetadata(
+  client: SupabaseClient,
+  eventId: string,
+  storagePath: string,
+  uploader: { id: string },
+) {
+  const { data, error } = await client
+    .from('event_attachments')
+    .insert({
+      event_id: eventId,
+      doc_type: 'RLS Test',
+      file_name: 'rls-attachment.txt',
+      storage_path: storagePath,
+      content_type: 'text/plain',
+      size_bytes: 19,
+      uploaded_by: uploader.id,
+    })
+    .select('id')
+    .single();
+  assert.equal(error, null, `attachment metadata insert failed: ${error?.message}`);
+  return data.id as string;
 }
 
 test('non-admin cannot read audit_log', { skip: !isConfigured ? skipReason : false }, async () => {
@@ -109,39 +153,86 @@ test('admin can read audit_log', { skip: !isConfigured ? skipReason : false }, a
   await adminClient.auth.signOut();
 });
 
+test('non-admin can read only their own profile', { skip: !isConfigured ? skipReason : false }, async () => {
+  const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+  const user = await currentUser(userClient);
+  const { data, error } = await userClient.from('profiles').select('id, email, role');
+
+  assert.equal(error, null, `non-admin profile select errored: ${error?.message}`);
+  assert.ok(data?.some((profile) => profile.id === user.id), 'user should see their own profile');
+  assert.ok(
+    data?.every((profile) => profile.id === user.id),
+    `non-admin should not see other profiles (got ${data?.map((profile) => profile.email).join(', ')})`,
+  );
+
+  await userClient.auth.signOut();
+});
+
+test('admin can read profiles for operations', { skip: !isConfigured ? skipReason : false }, async () => {
+  const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
+  const { data, error } = await adminClient
+    .from('profiles')
+    .select('email')
+    .in('email', [USER_EMAIL!, ADMIN_EMAIL!]);
+
+  assert.equal(error, null, `admin profile select errored: ${error?.message}`);
+  assert.ok(data?.some((profile) => profile.email === USER_EMAIL), 'admin should see user profile');
+  assert.ok(data?.some((profile) => profile.email === ADMIN_EMAIL), 'admin should see admin profile');
+
+  await adminClient.auth.signOut();
+});
+
+test(
+  'non-admin cannot read events they do not own',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
+    const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+    const eventId = await insertAdminEvent(adminClient);
+
+    try {
+      const { data, error } = await userClient.from('sourcing_events').select('id').eq('id', eventId);
+      assert.equal(error, null, `non-admin event select errored: ${error?.message}`);
+      assert.equal(data?.length ?? 0, 0, 'non-admin should not see admin/seeded events');
+    } finally {
+      await adminClient.from('sourcing_events').delete().eq('id', eventId);
+      await userClient.auth.signOut();
+      await adminClient.auth.signOut();
+    }
+  },
+);
+
 test(
   'non-admin cannot update an event they do not own',
   { skip: !isConfigured ? skipReason : false },
   async () => {
+    const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
     const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
-    // Pick any seeded event (these have no requestor_id, so the user is not owner).
-    const { data: events } = await userClient
-      .from('sourcing_events')
-      .select('id, status')
-      .is('request_created_at', null)
-      .limit(1);
-    if (!events || events.length === 0) {
-      // Nothing to assert against; treat as inconclusive rather than passing.
-      throw new Error('Seed at least one non-request event in the test project to run this assertion.');
+    const eventId = await insertAdminEvent(adminClient);
+
+    try {
+      const { error } = await userClient
+        .from('sourcing_events')
+        .update({ status: 'Live' })
+        .eq('id', eventId);
+      // The update is silently filtered (PostgREST returns success with 0 rows
+      // affected) OR errors with an RLS violation. Both are acceptable; what
+      // matters is that the row is unchanged.
+      const { data: after, error: readBackError } = await adminClient
+        .from('sourcing_events')
+        .select('status')
+        .eq('id', eventId)
+        .single();
+      assert.equal(readBackError, null, `admin readback failed: ${readBackError?.message}`);
+      assert.equal(after?.status, 'Planned', 'non-admin should not be able to mutate an admin event');
+      if (error) {
+        assert.match(error.message, /row-level security|permission|policy/i);
+      }
+    } finally {
+      await adminClient.from('sourcing_events').delete().eq('id', eventId);
+      await userClient.auth.signOut();
+      await adminClient.auth.signOut();
     }
-    const target = events[0];
-    const { error } = await userClient
-      .from('sourcing_events')
-      .update({ status: target.status === 'Planned' ? 'Live' : 'Planned' })
-      .eq('id', target.id);
-    // The update is silently filtered (PostgREST returns success with 0 rows
-    // affected) OR errors with an RLS violation. Both are acceptable; what
-    // matters is that the row is unchanged.
-    const { data: after } = await userClient
-      .from('sourcing_events')
-      .select('status')
-      .eq('id', target.id)
-      .single();
-    assert.equal(after?.status, target.status, 'non-admin should not be able to mutate a seeded event');
-    if (error) {
-      assert.match(error.message, /row-level security|permission|policy/i);
-    }
-    await userClient.auth.signOut();
   },
 );
 
@@ -175,25 +266,112 @@ test(
 );
 
 test(
+  'non-admin cannot read attachment metadata for an event they do not own',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
+    const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+    const admin = await currentUser(adminClient);
+    const eventId = await insertAdminEvent(adminClient);
+    const storagePath = await uploadTextAttachmentObject(adminClient, eventId);
+
+    try {
+      await insertAttachmentMetadata(adminClient, eventId, storagePath, admin);
+
+      const { data, error } = await userClient
+        .from('event_attachments')
+        .select('id')
+        .eq('storage_path', storagePath);
+      assert.equal(error, null, `non-admin attachment metadata select errored: ${error?.message}`);
+      assert.equal(data?.length ?? 0, 0, 'non-admin should not see unrelated attachment metadata');
+    } finally {
+      await adminClient.from('event_attachments').delete().eq('storage_path', storagePath);
+      await adminClient.storage.from('request-attachments').remove([storagePath]);
+      await adminClient.from('sourcing_events').delete().eq('id', eventId);
+      await userClient.auth.signOut();
+      await adminClient.auth.signOut();
+    }
+  },
+);
+
+test(
+  'admin can read attachment metadata for operations',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
+    const admin = await currentUser(adminClient);
+    const eventId = await insertAdminEvent(adminClient);
+    const storagePath = await uploadTextAttachmentObject(adminClient, eventId);
+
+    try {
+      const attachmentId = await insertAttachmentMetadata(adminClient, eventId, storagePath, admin);
+      const { data, error } = await adminClient
+        .from('event_attachments')
+        .select('id')
+        .eq('id', attachmentId)
+        .single();
+
+      assert.equal(error, null, `admin attachment metadata select errored: ${error?.message}`);
+      assert.equal(data?.id, attachmentId);
+    } finally {
+      await adminClient.from('event_attachments').delete().eq('storage_path', storagePath);
+      await adminClient.storage.from('request-attachments').remove([storagePath]);
+      await adminClient.from('sourcing_events').delete().eq('id', eventId);
+      await adminClient.auth.signOut();
+    }
+  },
+);
+
+test(
+  'requestor can read metadata and storage object for their event',
+  { skip: !isConfigured ? skipReason : false },
+  async () => {
+    const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
+    const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
+    const admin = await currentUser(adminClient);
+    const user = await currentUser(userClient);
+    const eventId = await insertOwnRequestEvent(userClient, user);
+    const storagePath = await uploadTextAttachmentObject(adminClient, eventId);
+
+    try {
+      const attachmentId = await insertAttachmentMetadata(adminClient, eventId, storagePath, admin);
+
+      const { data: attachment, error: metadataError } = await userClient
+        .from('event_attachments')
+        .select('id')
+        .eq('id', attachmentId)
+        .single();
+      assert.equal(metadataError, null, `requestor metadata select errored: ${metadataError?.message}`);
+      assert.equal(attachment?.id, attachmentId);
+
+      const { data: signedUrl, error: signedUrlError } = await userClient.storage
+        .from('request-attachments')
+        .createSignedUrl(storagePath, 60);
+      assert.equal(signedUrlError, null, `requestor signed URL failed: ${signedUrlError?.message}`);
+      assert.ok(signedUrl?.signedUrl, 'requestor should receive a signed attachment URL');
+    } finally {
+      await adminClient.from('event_attachments').delete().eq('storage_path', storagePath);
+      await adminClient.storage.from('request-attachments').remove([storagePath]);
+      await adminClient.from('sourcing_events').delete().eq('id', eventId);
+      await userClient.auth.signOut();
+      await adminClient.auth.signOut();
+    }
+  },
+);
+
+test(
   'non-admin cannot attach metadata to an event they do not own',
   { skip: !isConfigured ? skipReason : false },
   async () => {
+    const adminClient = await clientAs(ADMIN_EMAIL!, ADMIN_PASSWORD!);
     const userClient = await clientAs(USER_EMAIL!, USER_PASSWORD!);
     const user = await currentUser(userClient);
-    const { data: events, error: selectError } = await userClient
-      .from('sourcing_events')
-      .select('id')
-      .is('request_created_at', null)
-      .limit(1);
-    assert.equal(selectError, null, `seeded event lookup failed: ${selectError?.message}`);
-    if (!events || events.length === 0) {
-      throw new Error('Seed at least one non-request event in the test project to run this assertion.');
-    }
+    const eventId = await insertAdminEvent(adminClient);
 
-    const storagePath = await uploadTextAttachmentObject(userClient, `RLS-FORGED-${randomUUID().slice(0, 8)}`);
+    const storagePath = await uploadTextAttachmentObject(userClient, eventId);
     try {
       const { error } = await userClient.from('event_attachments').insert({
-        event_id: events[0].id,
+        event_id: eventId,
         doc_type: 'RLS Test',
         file_name: 'forged-event.txt',
         storage_path: storagePath,
@@ -208,7 +386,9 @@ test(
       assert.match(error.message, /row-level security|permission|policy|violates/i);
     } finally {
       await userClient.storage.from('request-attachments').remove([storagePath]);
+      await adminClient.from('sourcing_events').delete().eq('id', eventId);
       await userClient.auth.signOut();
+      await adminClient.auth.signOut();
     }
   },
 );

@@ -16,9 +16,18 @@ database, not only in React route guards.
 - The service role key is local-only for seeding and must never be exposed to
   Vite or Vercel client environments.
 - Production auth model is admin-created or invited Supabase users. Public
-  signup is hidden unless `VITE_AUTH_SIGNUP_ENABLED=true` is set intentionally.
+  signup is hidden unless `VITE_ALLOW_SIGNUP=true` is set intentionally.
 - Attachment metadata inserts require an owned storage object and an event the
   caller is allowed to attach to.
+- Attachment metadata and request attachment downloads are limited to admins,
+  uploaders, or the requestor tied to the event.
+
+## RLS smoke tests
+
+`tests/rls.test.ts` runs against a throwaway Supabase project when
+`SUPABASE_TEST_*` credentials are configured. Without those env vars the tests
+skip locally, but they still document the expected profile, event, attachment,
+audit, baseline, and client-error policy behavior.
 
 ## Sprint 1 follow-ups
 

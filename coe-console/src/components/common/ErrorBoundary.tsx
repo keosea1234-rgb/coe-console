@@ -7,14 +7,14 @@ interface ErrorBoundaryProps {
 }
 
 interface ErrorBoundaryState {
-  message: string | null;
+  hasError: boolean;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { message: null };
+  state: ErrorBoundaryState = { hasError: false };
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { message: error.message || 'Unexpected application error.' };
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   render() {
-    if (!this.state.message) return this.props.children;
+    if (!this.state.hasError) return this.props.children;
 
     return (
       <main
@@ -67,25 +67,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               lineHeight: 1.5,
             }}
           >
-            The console hit an unexpected error. Reload the page to start a fresh session.
+            The console hit an unexpected error. Reload the page to start a fresh session. If
+            the problem continues, contact your CoE administrator.
           </p>
-          <pre
-            style={{
-              margin: '0 0 18px',
-              maxHeight: 120,
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              border: `1px solid ${theme.border}`,
-              borderRadius: 6,
-              background: theme.surfaceMuted,
-              color: theme.textSecondary,
-              padding: 10,
-              fontFamily: theme.mono,
-              fontSize: 11,
-            }}
-          >
-            {this.state.message}
-          </pre>
           <button
             type="button"
             className="ui-btn ui-btn--primary"

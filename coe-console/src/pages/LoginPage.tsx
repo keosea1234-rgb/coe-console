@@ -1,15 +1,19 @@
 import { useState, type FormEvent } from 'react';
 import { Card } from '../components/common/Card';
 import { useSession } from '../domain/session';
+import { isEnvFlagEnabled } from '../lib/env';
 import { theme } from '../styles/theme';
 
 type Mode = 'signin' | 'signup';
 
-const PUBLIC_SIGNUP_ENABLED = import.meta.env.VITE_AUTH_SIGNUP_ENABLED?.toLowerCase() === 'true';
+export function isPublicSignupEnabled(): boolean {
+  return isEnvFlagEnabled('VITE_ALLOW_SIGNUP');
+}
 
 export function LoginPage() {
   const signIn = useSession((s) => s.signIn);
   const signUp = useSession((s) => s.signUp);
+  const allowSignup = isPublicSignupEnabled();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -25,7 +29,7 @@ export function LoginPage() {
     setError(null);
     setInfo(null);
 
-    if (mode === 'signup' && !PUBLIC_SIGNUP_ENABLED) {
+    if (mode === 'signup' && !allowSignup) {
       setBusy(false);
       setError('Public signup is disabled. Ask a CoE admin to create or invite your account.');
       return;
@@ -76,12 +80,12 @@ export function LoginPage() {
           </div>
           <div style={{ fontSize: 17, fontWeight: 800, color: theme.ink }}>eSourcing CoE Console</div>
           <div style={{ fontSize: 12.5, color: theme.textSecondary, marginTop: 4 }}>
-            {mode === 'signin' || !PUBLIC_SIGNUP_ENABLED ? 'Sign in to continue' : 'Create your account'}
+            {mode === 'signin' || !allowSignup ? 'Sign in to continue' : 'Create your account'}
           </div>
         </div>
 
         <Card style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {PUBLIC_SIGNUP_ENABLED && (
+          {allowSignup && (
             <div style={{ display: 'flex', gap: 6 }}>
               <TabButton active={mode === 'signin'} onClick={() => switchMode('signin')}>Sign in</TabButton>
               <TabButton active={mode === 'signup'} onClick={() => switchMode('signup')}>Sign up</TabButton>
@@ -105,7 +109,7 @@ export function LoginPage() {
               onChange={setPassword}
               required
               minLength={6}
-              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              autoComplete={mode === 'signin' || !allowSignup ? 'current-password' : 'new-password'}
             />
 
             {error && <Banner kind="error">{error}</Banner>}
@@ -128,7 +132,7 @@ export function LoginPage() {
                 transition: `all ${theme.transitionFast} ${theme.easing}`,
               }}
             >
-              {busy ? 'Please wait…' : mode === 'signup' && PUBLIC_SIGNUP_ENABLED ? 'Create account' : 'Sign in'}
+              {busy ? 'Please wait…' : mode === 'signup' && allowSignup ? 'Create account' : 'Sign in'}
             </button>
           </form>
         </Card>

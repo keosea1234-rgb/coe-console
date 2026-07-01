@@ -23,6 +23,8 @@ Open **SQL Editor -> New query** in the Supabase dashboard and run the files in 
 9. `migrations/0009_event_attachments.sql` - storage bucket + metadata table for request attachments.
 10. `migrations/0010_client_errors.sql` - sink table for client runtime error reports (admins read; clients append-only).
 11. `migrations/0011_audit_log_retention.sql` - prune function + optional pg_cron daily schedule for `audit_log` retention.
+12. `migrations/0012_request_updates.sql` - request conversation updates and participant RLS.
+13. `migrations/0013_rls_attachment_hardening.sql` - profile, event, attachment metadata, and attachment download read hardening.
 
 For each file: paste the contents -> **Run**. You should see a "Success. No rows returned." message. If a statement fails partway through, fix the cause and re-run the whole file.
 
@@ -39,7 +41,7 @@ Paste these into `coe-console/.env.local` (see `.env.example`). Never commit `.e
 
 Production access is admin-created or invite-only. Keep public signup disabled
 unless a non-production environment deliberately sets
-`VITE_AUTH_SIGNUP_ENABLED=true`.
+`VITE_ALLOW_SIGNUP=true`.
 
 1. In the dashboard: **Authentication -> Users -> Add user**. Create at least one user that will become the CoE admin.
 2. Run this in SQL Editor to promote them:
@@ -98,12 +100,12 @@ This reloads the deterministic `generateEvents()` dataset into
 
 | Table                | Read          | Insert                   | Update                   | Delete                    |
 |----------------------|---------------|--------------------------|--------------------------|---------------------------|
-| `profiles`           | any signed-in | trigger only             | manual (SQL)             | cascade from `auth.users` |
-| `sourcing_events`    | any signed-in | self request / admin     | admin or own planned     | admin or own planned      |
+| `profiles`           | self / admin  | trigger only             | manual (SQL)             | cascade from `auth.users` |
+| `sourcing_events`    | requestor / admin | self request / admin | admin or own planned     | admin or own planned      |
 | `spend_baseline`     | any signed-in | admin only               | admin only               | admin only                |
 | `feedback_responses` | admin / own   | own requested event only | own requested event only | blocked                   |
 | `audit_log`          | admin only    | trigger only             | blocked                  | blocked                   |
-| `event_attachments`  | any signed-in | owned object + allowed event | blocked                  | admin or uploader         |
+| `event_attachments`  | admin / uploader / requestor | owned object + allowed event | blocked                  | admin or uploader         |
 | `client_errors`      | admin only    | self or anon             | blocked                  | blocked                   |
 
 ## Audit log retention
@@ -142,7 +144,6 @@ SUPABASE_TEST_ADMIN_PASSWORD=
 Preconditions:
 - Test project has every migration applied.
 - One profile is promoted to `admin`; another remains `user`.
-- At least one seeded (non-request) event exists in `sourcing_events`.
 - The `request-attachments` storage bucket exists from migration `0009`.
 
 When any env var is missing the tests skip cleanly so local runs are unaffected.

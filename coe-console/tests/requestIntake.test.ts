@@ -81,11 +81,11 @@ test('buildRequestEvent normalizes payload for Supabase-backed store insert', ()
   assert.equal(event.region, 'NA');
   assert.deepEqual(event.regions, ['NA', 'EMEA']);
   assert.deepEqual(event.businessGroups, [
-    { region: 'NA', addressable: 100_000, sourced: 100_000 },
-    { region: 'EMEA', addressable: 50_001, sourced: 50_001 },
+    { region: 'NA', addressable: 100_000, sourced: 0 },
+    { region: 'EMEA', addressable: 50_001, sourced: 0 },
   ]);
   assert.equal(event.addressable, 150_001);
-  assert.equal(event.sourced, 150_001);
+  assert.equal(event.sourced, 0);
   assert.equal(event.type, 'Reverse Auction');
   assert.deepEqual(event.eventTypes, ['Reverse Auction', 'RFQ']);
   assert.equal(event.requestCreatedAt, '2026-06-28T12:00:00.000Z');
