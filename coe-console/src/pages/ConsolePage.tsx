@@ -39,7 +39,9 @@ import { SubcategoryDeepDive } from '../components/console/SubcategoryDeepDive';
 import { WeeklyReports } from '../components/console/WeeklyReports';
 import { RequestInbox } from '../components/console/RequestInbox';
 import { MyRequests } from '../components/console/MyRequests';
-import { TemplatesLearningTab } from '../components/console/TemplatesLearningTab';
+import { LearningTab } from '../components/console/LearningTab';
+import { GovernanceTab } from '../components/console/GovernanceTab';
+import { CategoryTab } from '../components/console/CategoryTab';
 import { ClientErrorLog } from '../components/console/ClientErrorLog';
 
 export function ConsolePage() {
@@ -132,6 +134,7 @@ export function ConsolePage() {
     () => (filters.regions.length ? filters.regions : REGIONS),
     [filters.regions],
   );
+  const isLibraryTab = tab === 'learning' || tab === 'governance' || tab === 'category' || tab === 'errors';
 
   const pendingRequests = useMemo(
     () =>
@@ -153,10 +156,10 @@ export function ConsolePage() {
         pendingRequests={pendingRequests}
         myRequests={myRequests.length}
       />
-      {tab !== 'templatesLearning' && tab !== 'errors' && <FilterBar summary={totals} />}
+      {!isLibraryTab && <FilterBar summary={totals} />}
 
       <div className="app-content fade-up">
-        {tab !== 'templatesLearning' && tab !== 'errors' && <DataFreshnessIndicator {...freshness} />}
+        {!isLibraryTab && <DataFreshnessIndicator {...freshness} />}
         {error && (
           <div
             role="alert"
@@ -195,7 +198,7 @@ export function ConsolePage() {
           </div>
         )}
 
-        {loading && tab !== 'templatesLearning' && tab !== 'errors' ? (
+        {loading && !isLibraryTab ? (
           <div
             style={{
               display: 'grid',
@@ -260,7 +263,11 @@ export function ConsolePage() {
 
             {tab === 'myRequests' && canViewOwnRequests && <MyRequests events={events} user={user} />}
 
-            {tab === 'templatesLearning' && <TemplatesLearningTab />}
+            {tab === 'learning' && <LearningTab />}
+
+            {tab === 'governance' && <GovernanceTab />}
+
+            {tab === 'category' && <CategoryTab />}
 
             {tab === 'errors' && canViewErrors && <ClientErrorLog />}
           </>

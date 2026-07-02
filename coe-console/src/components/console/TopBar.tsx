@@ -1,19 +1,23 @@
 import { Link } from 'react-router-dom';
 import { theme } from '../../styles/theme';
-import { SegmentedControl } from '../common/primitives';
 import { IconReport } from './icons';
 import { useSession } from '../../domain/session';
 import { hasPermission } from '../../domain/authz';
+import { DevAccountSwitchButton } from '../dev/DevAccountSwitch';
 
 export type ConsoleTab =
   | 'exec'
   | 'coverageMap'
   | 'ops'
-  | 'templatesLearning'
+  | 'learning'
+  | 'governance'
+  | 'category'
   | 'myRequests'
   | 'spend'
   | 'inbox'
   | 'errors';
+
+type NavItem = { value: ConsoleTab; label: string; badge?: number };
 
 export function TopBar({
   tab,
@@ -37,154 +41,110 @@ export function TopBar({
   const canAdminEvents = hasPermission(user, 'event:admin');
   const canViewErrors = hasPermission(user, 'admin:audit');
 
-  const baseTabs: { value: ConsoleTab; label: string }[] = [
+  const overviewItems: NavItem[] = [
     { value: 'exec', label: 'Exec overview' },
     { value: 'coverageMap', label: 'Coverage map' },
     { value: 'ops', label: 'Operational console' },
-    { value: 'templatesLearning', label: 'Templates & Learning' },
   ];
-  const userTabs: { value: ConsoleTab; label: string }[] = canViewOwnRequests
-    ? [
-        {
-          value: 'myRequests',
-          label: myRequests > 0 ? `My requests (${myRequests})` : 'My requests',
-        },
-      ]
-    : [];
-  const adminTabs: { value: ConsoleTab; label: string }[] = canAdminEvents || canViewRequestInbox || canViewErrors
-    ? [
-        ...(canAdminEvents ? [{ value: 'spend' as const, label: 'Spend data' }] : []),
-        ...(canViewRequestInbox
-          ? [
-              {
-                value: 'inbox' as const,
-                label: pendingRequests > 0 ? `Inbox (${pendingRequests})` : 'Inbox',
-              },
-            ]
-          : []),
-        ...(canViewErrors ? [{ value: 'errors' as const, label: 'Errors' }] : []),
-      ]
-    : [];
-  const tabs = [...baseTabs, ...userTabs, ...adminTabs];
+  const knowledgeItems: NavItem[] = [
+    { value: 'learning', label: 'Learning' },
+    { value: 'governance', label: 'Governance' },
+    { value: 'category', label: 'Category' },
+  ];
+  const workspaceItems: NavItem[] = [
+    ...(canViewOwnRequests ? [{ value: 'myRequests' as const, label: 'My requests', badge: myRequests }] : []),
+    ...(canAdminEvents ? [{ value: 'spend' as const, label: 'Spend data' }] : []),
+    ...(canViewRequestInbox ? [{ value: 'inbox' as const, label: 'Inbox', badge: pendingRequests }] : []),
+    ...(canViewErrors ? [{ value: 'errors' as const, label: 'Errors' }] : []),
+  ];
+
+  const navGroups: Array<{ title: string; items: NavItem[] }> = [
+    {
+      title: 'Overview',
+      items: overviewItems,
+    },
+    {
+      title: 'Knowledge',
+      items: knowledgeItems,
+    },
+    {
+      title: canAdminEvents || canViewRequestInbox || canViewErrors ? 'Workspace & Admin' : 'Workspace',
+      items: workspaceItems,
+    },
+  ].filter((group) => group.items.length > 0);
 
   return (
-    <header className="sticky-header" style={{ height: theme.headerH }}>
-      <div
-        style={{
-          maxWidth: 1320,
-          margin: '0 auto',
-          padding: '0 20px',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: theme.primary,
-              display: 'grid',
-              placeItems: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 15,
-              boxShadow: '0 1px 3px rgba(15,118,110,.3)',
-            }}
-          >
-            e
-          </div>
-          <div style={{ lineHeight: 1.25 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0, color: theme.ink }}>
-              eSourcing CoE
-            </div>
-            <div style={{ fontSize: 11, color: theme.textSecondary, fontWeight: 500 }}>
-              Sourcing Spend &amp; Coverage Console
-            </div>
-          </div>
+    <aside className="app-sidebar" aria-label="Primary navigation">
+      <div className="app-sidebar__brand">
+        <div className="app-sidebar__mark">e</div>
+        <div style={{ minWidth: 0 }}>
+          <div className="app-sidebar__brand-title">eSourcing CoE</div>
+          <div className="app-sidebar__brand-subtitle">Spend &amp; Coverage Console</div>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div style={{ margin: '0 auto' }}>
-          <SegmentedControl options={tabs} value={tab} onChange={onTab} />
-        </div>
+      <nav className="app-sidebar__nav">
+        {navGroups.map((group) => (
+          <section key={group.title} className="app-sidebar__group">
+            <div className="app-sidebar__group-title">{group.title}</div>
+            <div className="app-sidebar__group-items">
+              {group.items.map((item) => {
+                const active = item.value === tab;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => onTab(item.value)}
+                    className={`app-sidebar__item${active ? ' is-active' : ''}`}
+                  >
+                    <span>{item.label}</span>
+                    {!!item.badge && <span className="app-sidebar__badge">{item.badge}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </nav>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-          {canCreateRequest && (
-            <Link
-              to="/new-request"
-              className="ui-btn ui-btn--primary"
-              style={{ textDecoration: 'none', padding: '7px 13px', fontSize: 12.5 }}
-            >
-              New sourcing request
-            </Link>
-          )}
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              fontFamily: theme.mono,
-              color: theme.textSecondary,
-              background: theme.surface,
-              border: `1px solid ${theme.border}`,
-              borderRadius: 6,
-              padding: '5px 9px',
-            }}
-          >
-            USD
-          </span>
+      <div className="app-sidebar__footer">
+        <div className="app-sidebar__quick-actions">
+          <span className="app-sidebar__currency">USD</span>
           {canAdminEvents && (
-            <button type="button" onClick={onReports} className="ui-btn ui-btn--dark" style={{ fontSize: 12.5 }}>
+            <button type="button" onClick={onReports} className="ui-btn ui-btn--dark app-sidebar__action">
               <IconReport size={14} />
               Weekly reports
             </button>
           )}
-          {user && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                paddingLeft: 8,
-                marginLeft: 4,
-                borderLeft: `1px solid ${theme.border}`,
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.2 }}>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '.06em',
-                    textTransform: 'uppercase',
-                    color: isAdminRole ? theme.primary : theme.textTertiary,
-                    fontFamily: theme.mono,
-                  }}
-                >
-                  {isAdminRole ? 'Admin' : 'User'}
-                </span>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: theme.textSecondary }}>
-                  {user.email}
-                </span>
-              </div>
+          {canCreateRequest && (
+            <Link to="/new-request" className="ui-btn ui-btn--primary app-sidebar__action">
+              New sourcing request
+            </Link>
+          )}
+        </div>
+
+        {user && (
+          <div className="app-sidebar__account">
+            <div className="app-sidebar__role" style={{ color: isAdminRole ? theme.primary : theme.textTertiary }}>
+              {isAdminRole ? 'Admin' : 'User'}
+            </div>
+            <div className="app-sidebar__email" title={user.email}>
+              {user.email}
+            </div>
+            <div className="app-sidebar__account-actions">
+              <DevAccountSwitchButton compact className="ui-btn ui-btn--secondary app-sidebar__small-button" />
               <button
                 type="button"
                 onClick={logout}
-                className="ui-btn ui-btn--ghost"
-                style={{ fontSize: 11.5, padding: '6px 10px' }}
+                className="ui-btn ui-btn--ghost app-sidebar__small-button"
               >
                 Sign out
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-    </header>
+    </aside>
   );
 }

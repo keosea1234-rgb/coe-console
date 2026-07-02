@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Card } from '../components/common/Card';
+import { DevAccountSwitchPanel } from '../components/dev/DevAccountSwitch';
 import { useSession } from '../domain/session';
 import { isEnvFlagEnabled } from '../lib/env';
 import { theme } from '../styles/theme';
@@ -85,6 +86,8 @@ export function LoginPage() {
         </div>
 
         <Card style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <DevAccountSwitchPanel />
+
           {allowSignup && (
             <div style={{ display: 'flex', gap: 6 }}>
               <TabButton active={mode === 'signin'} onClick={() => switchMode('signin')}>Sign in</TabButton>

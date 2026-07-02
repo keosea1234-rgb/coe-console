@@ -152,6 +152,12 @@ Optional:
 
 - `VITE_AUTH_SIGNUP_ENABLED=true` exposes public signup. Leave unset or `false`
   for production admin-created/invited users.
+- `VITE_ENABLE_ACCOUNT_SWITCH=true` exposes the one-click admin/user switcher in
+  controlled test deployments. Local dev only needs the account credentials
+  below; the explicit flag is required outside `npm run dev`.
+- `VITE_DEV_ADMIN_EMAIL`, `VITE_DEV_ADMIN_PASSWORD`, `VITE_DEV_USER_EMAIL`, and
+  `VITE_DEV_USER_PASSWORD` power the account switcher. Use seeded test accounts
+  only, never real production users.
 
 `SUPABASE_SERVICE_ROLE_KEY` is local-only for `npm run seed`. Never add it to
 Vercel or commit it to the repo.
