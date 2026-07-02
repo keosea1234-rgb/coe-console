@@ -18,5 +18,7 @@ test('error boundary hides raw technical error details', () => {
 
   const html = renderToStaticMarkup(rendered);
   assert.match(html, /Something went wrong/);
+  assert.match(html, /Try again/);
+  assert.match(html, /Reload page/);
   assert.doesNotMatch(html, new RegExp(technicalMessage));
 });

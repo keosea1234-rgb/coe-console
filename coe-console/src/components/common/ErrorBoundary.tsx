@@ -21,6 +21,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     reportClientError(error, { source: 'error-boundary', componentStack: info.componentStack ?? undefined });
   }
 
+  private retry = () => {
+    this.setState({ hasError: false });
+  };
+
+  private reload = () => {
+    window.location.reload();
+  };
+
   render() {
     if (!this.state.hasError) return this.props.children;
 
@@ -67,16 +75,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               lineHeight: 1.5,
             }}
           >
-            The console hit an unexpected error. Reload the page to start a fresh session. If
-            the problem continues, contact your CoE administrator.
+            The console hit an unexpected error. Try again or reload the page to start a fresh
+            session. If the problem continues, contact your CoE administrator.
           </p>
-          <button
-            type="button"
-            className="ui-btn ui-btn--primary"
-            onClick={() => window.location.reload()}
-          >
-            Reload
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={this.retry}>
+              Try again
+            </button>
+            <button type="button" className="ui-btn ui-btn--secondary" onClick={this.reload}>
+              Reload page
+            </button>
+          </div>
         </section>
       </main>
     );

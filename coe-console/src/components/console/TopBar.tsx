@@ -3,8 +3,17 @@ import { theme } from '../../styles/theme';
 import { SegmentedControl } from '../common/primitives';
 import { IconReport } from './icons';
 import { useSession } from '../../domain/session';
+import { hasPermission } from '../../domain/authz';
 
-export type ConsoleTab = 'exec' | 'coverageMap' | 'ops' | 'templatesLearning' | 'myRequests' | 'spend' | 'inbox';
+export type ConsoleTab =
+  | 'exec'
+  | 'coverageMap'
+  | 'ops'
+  | 'templatesLearning'
+  | 'myRequests'
+  | 'spend'
+  | 'inbox'
+  | 'errors';
 
 export function TopBar({
   tab,
@@ -21,7 +30,12 @@ export function TopBar({
 }) {
   const user = useSession((s) => s.user);
   const logout = useSession((s) => s.logout);
-  const isAdmin = user?.role === 'admin';
+  const isAdminRole = user?.role === 'admin';
+  const canCreateRequest = hasPermission(user, 'request:create');
+  const canViewOwnRequests = hasPermission(user, 'request:view_own');
+  const canViewRequestInbox = hasPermission(user, 'request:view_all');
+  const canAdminEvents = hasPermission(user, 'event:admin');
+  const canViewErrors = hasPermission(user, 'admin:audit');
 
   const baseTabs: { value: ConsoleTab; label: string }[] = [
     { value: 'exec', label: 'Exec overview' },
@@ -29,7 +43,7 @@ export function TopBar({
     { value: 'ops', label: 'Operational console' },
     { value: 'templatesLearning', label: 'Templates & Learning' },
   ];
-  const userTabs: { value: ConsoleTab; label: string }[] = !isAdmin
+  const userTabs: { value: ConsoleTab; label: string }[] = canViewOwnRequests
     ? [
         {
           value: 'myRequests',
@@ -37,13 +51,18 @@ export function TopBar({
         },
       ]
     : [];
-  const adminTabs: { value: ConsoleTab; label: string }[] = isAdmin
+  const adminTabs: { value: ConsoleTab; label: string }[] = canAdminEvents || canViewRequestInbox || canViewErrors
     ? [
-        { value: 'spend', label: 'Spend data' },
-        {
-          value: 'inbox',
-          label: pendingRequests > 0 ? `Inbox (${pendingRequests})` : 'Inbox',
-        },
+        ...(canAdminEvents ? [{ value: 'spend' as const, label: 'Spend data' }] : []),
+        ...(canViewRequestInbox
+          ? [
+              {
+                value: 'inbox' as const,
+                label: pendingRequests > 0 ? `Inbox (${pendingRequests})` : 'Inbox',
+              },
+            ]
+          : []),
+        ...(canViewErrors ? [{ value: 'errors' as const, label: 'Errors' }] : []),
       ]
     : [];
   const tabs = [...baseTabs, ...userTabs, ...adminTabs];
@@ -85,7 +104,7 @@ export function TopBar({
               eSourcing CoE
             </div>
             <div style={{ fontSize: 11, color: theme.textSecondary, fontWeight: 500 }}>
-              Event &amp; Coverage Console
+              Sourcing Spend &amp; Coverage Console
             </div>
           </div>
         </div>
@@ -97,13 +116,13 @@ export function TopBar({
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-          {!isAdmin && (
+          {canCreateRequest && (
             <Link
               to="/new-request"
               className="ui-btn ui-btn--primary"
               style={{ textDecoration: 'none', padding: '7px 13px', fontSize: 12.5 }}
             >
-              New Event Request
+              New sourcing request
             </Link>
           )}
           <span
@@ -120,7 +139,7 @@ export function TopBar({
           >
             USD
           </span>
-          {isAdmin && (
+          {canAdminEvents && (
             <button type="button" onClick={onReports} className="ui-btn ui-btn--dark" style={{ fontSize: 12.5 }}>
               <IconReport size={14} />
               Weekly reports
@@ -144,11 +163,11 @@ export function TopBar({
                     fontWeight: 700,
                     letterSpacing: '.06em',
                     textTransform: 'uppercase',
-                    color: isAdmin ? theme.primary : theme.textTertiary,
+                    color: isAdminRole ? theme.primary : theme.textTertiary,
                     fontFamily: theme.mono,
                   }}
                 >
-                  {isAdmin ? 'Admin' : 'User'}
+                  {isAdminRole ? 'Admin' : 'User'}
                 </span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: theme.textSecondary }}>
                   {user.email}

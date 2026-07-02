@@ -41,7 +41,7 @@ export function SpendBaselineGrid() {
               disabled={baselineLoading}
               style={{ fontSize: 12, padding: '7px 12px' }}
             >
-              Clear scope
+              Clear baseline
             </Button>
           </div>
         </div>
@@ -94,8 +94,8 @@ function FyBlock({
       <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <CardTitle style={{ fontFamily: theme.mono }}>{fy}</CardTitle>
         <div style={{ display: 'flex', gap: 18 }}>
-          <Summary label="Addressable" value={fmtUSD(addressable)} />
-          <Summary label="Sourced" value={fmtUSD(sourced)} />
+          <Summary label="Addressable spend" value={fmtUSD(addressable)} />
+          <Summary label="Sourced spend" value={fmtUSD(sourced)} />
           <Summary label="Coverage" value={fmtPct(addressable > 0 ? sourced / addressable : 0)} accent={theme.primary} />
         </div>
       </div>
@@ -131,6 +131,7 @@ function FyBlock({
                       <td key={r} style={gd('right')}>
                         <input
                           type="number"
+                          aria-label={`${fy} ${c.name} ${r} addressable spend baseline`}
                           value={manual ? Math.round(val) : ''}
                           placeholder={fmtUSD(val)}
                           disabled={baselineLoading}

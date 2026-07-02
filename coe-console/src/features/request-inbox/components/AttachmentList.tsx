@@ -33,11 +33,15 @@ export function AttachmentList({
   }
 
   if (!attachments) {
-    return <span style={{ fontSize: 11.5, color: theme.textTertiary }}>Checking...</span>;
+    return <span style={{ fontSize: 11.5, color: theme.textTertiary }}>Checking attachments...</span>;
   }
 
   if (attachments.length === 0) {
-    return <span style={{ fontSize: 11.5, color: theme.textTertiary }}>None</span>;
+    return (
+      <span style={{ fontSize: 11.5, color: theme.textTertiary, whiteSpace: 'normal' }}>
+        No attachments submitted.
+      </span>
+    );
   }
 
   return (
@@ -70,6 +74,7 @@ export function AttachmentList({
             type="button"
             onClick={() => onDownload(attachment)}
             disabled={downloadingId === attachment.id}
+            aria-label={`Download attachment ${attachment.file_name}`}
             title={`Download ${attachment.file_name}`}
             style={{
               width: 'fit-content',

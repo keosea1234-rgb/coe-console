@@ -106,9 +106,9 @@ function Body({ data, onClose }: { data: DeepDive; onClose: () => void }) {
             gap: 14,
           }}
         >
-          <Tile label="Addressable" value={fmtUSD(data.addressable)} />
-          <Tile label="Sourced" value={fmtUSD(data.sourced)} />
-          <Tile label="Coverage" value={fmtPct(data.coverage)} accent={theme.primary} />
+          <Tile label="Addressable spend" value={fmtUSD(data.addressable)} />
+          <Tile label="Sourced spend" value={fmtUSD(data.sourced)} />
+          <Tile label="Spend coverage" value={fmtPct(data.coverage)} accent={theme.primary} />
           <Tile label="Untapped gap" value={fmtUSD(data.untapped)} accent={theme.warning} />
           <Tile label="Events" value={String(data.events)} />
         </div>
@@ -151,8 +151,8 @@ function Body({ data, onClose }: { data: DeepDive; onClose: () => void }) {
               <th style={dh('left', 28)}>#</th>
               <th style={dh('left')}>Subcategory</th>
               <th style={dh('left', 150)}>Coverage</th>
-              <th style={dh('right')}>Addressable</th>
-              <th style={dh('right')}>Sourced</th>
+              <th style={dh('right')}>Addressable spend</th>
+              <th style={dh('right')}>Sourced spend</th>
               <th style={dh('right')}>Savings</th>
               <th style={dh('right')}>Events</th>
               <th style={dh('right')}>Auction %</th>

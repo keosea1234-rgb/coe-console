@@ -96,7 +96,7 @@ export function InsightsStrip({ insights }: { insights: Insights }) {
       <InsightCard
         accent={theme.chart2}
         icon={<IconTarget size={15} />}
-        eyebrow="Auction adoption"
+        eyebrow="Auction effectiveness"
         headline={
           <>
             {REGION_LABEL[auctionLeader.region]} leads at {fmtPct(auctionLeader.share)}
@@ -112,7 +112,7 @@ export function InsightsStrip({ insights }: { insights: Insights }) {
       <InsightCard
         accent={theme.warning}
         icon={<IconLayers size={15} />}
-        eyebrow="Coverage gap"
+        eyebrow="Spend coverage gap"
         headline={
           <>
             {coverageGapCategory.category} at {fmtPct(coverageGapCategory.coverage)}
@@ -129,7 +129,7 @@ export function InsightsStrip({ insights }: { insights: Insights }) {
             {growthPipeline.category} - {fmtUSD(growthPipeline.addressable)}
           </>
         }
-        detail={<>Largest FY27 planned addressable spend - the headline opportunity ahead.</>}
+        detail={<>Largest FY27 planned addressable spend - the headline pipeline opportunity ahead.</>}
       />
     </div>
   );

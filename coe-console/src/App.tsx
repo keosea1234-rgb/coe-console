@@ -4,6 +4,7 @@ import { RequestFormPage } from './pages/RequestFormPage';
 import { FeedbackPage } from './pages/FeedbackPage';
 import { LoginPage } from './pages/LoginPage';
 import { useSession } from './domain/session';
+import { hasAnyPermission, hasPermission, type Permission } from './domain/authz';
 import { DevAccountSwitch } from './components/dev/DevAccountSwitch';
 import { theme } from './styles/theme';
 
@@ -13,18 +14,20 @@ function AuthGate({ children }: { children: React.ReactElement }) {
   return children;
 }
 
-function RequireAuth({ children }: { children: React.ReactElement }) {
+function RequirePermission({
+  permission,
+  anyOf,
+  children,
+}: {
+  permission?: Permission;
+  anyOf?: readonly Permission[];
+  children: React.ReactElement;
+}) {
   const user = useSession((s) => s.user);
   const location = useLocation();
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  return children;
-}
-
-function RequireRole({ role, children }: { role: 'user' | 'admin'; children: React.ReactElement }) {
-  const user = useSession((s) => s.user);
-  const location = useLocation();
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.role !== role) return <Navigate to="/" replace />;
+  const allowed = permission ? hasPermission(user, permission) : hasAnyPermission(user, anyOf ?? []);
+  if (!allowed) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -71,25 +74,25 @@ export default function App() {
           <Route
             path="/"
             element={
-              <RequireAuth>
+              <RequirePermission permission="analytics:view">
                 <ConsolePage />
-              </RequireAuth>
+              </RequirePermission>
             }
           />
           <Route
             path="/new-request"
             element={
-              <RequireRole role="user">
+              <RequirePermission permission="request:create">
                 <RequestFormPage />
-              </RequireRole>
+              </RequirePermission>
             }
           />
           <Route
             path="/feedback/:eventId"
             element={
-              <RequireAuth>
+              <RequirePermission anyOf={['request:view_own', 'request:view_all']}>
                 <FeedbackPage />
-              </RequireAuth>
+              </RequirePermission>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />

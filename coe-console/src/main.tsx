@@ -15,7 +15,6 @@ configureErrorReportingSink({
     return {
       appVersion: import.meta.env.VITE_APP_VERSION ?? undefined,
       actorId: user?.id ?? null,
-      actorEmail: user?.email ?? null,
     };
   },
 });

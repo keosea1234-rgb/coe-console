@@ -2,6 +2,7 @@ import { theme } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import type { QuarterPoint } from '../../domain/selectors';
 import { fmtUSD } from '../../domain/selectors';
+import { EmptyState } from './EmptyState';
 
 export function SavingsTrendChart({ points }: { points: QuarterPoint[] }) {
   const W = 560;
@@ -26,8 +27,12 @@ export function SavingsTrendChart({ points }: { points: QuarterPoint[] }) {
     return (
       <Card>
         <CardTitle sub="Across 12 fiscal quarters (Amcor FY)">Realized savings trend</CardTitle>
-        <div style={{ padding: '28px 0', textAlign: 'center', color: theme.textTertiary, fontSize: 13 }}>
-          No realized savings in the current filter scope.
+        <div style={{ marginTop: 14 }}>
+          <EmptyState
+            compact
+            title="No realized savings in scope"
+            detail="Savings will appear here when filtered events include recorded savings."
+          />
         </div>
       </Card>
     );
@@ -54,7 +59,7 @@ export function SavingsTrendChart({ points }: { points: QuarterPoint[] }) {
         width="100%"
         height={H}
         role="img"
-        aria-label="Savings trend"
+        aria-label="Realized savings trend by fiscal quarter"
         style={{ marginTop: 8 }}
       >
         <defs>

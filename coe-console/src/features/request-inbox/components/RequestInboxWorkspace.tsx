@@ -86,8 +86,8 @@ export function RequestInboxWorkspace({
   const badges = [
     event.directness,
     event.shouldCostModeling ? 'Should-cost' : undefined,
-    event.riskAssessment ? 'Risk' : undefined,
-    event.esgAssessment ? 'ESG' : undefined,
+    event.riskAssessment ? 'Risk review' : undefined,
+    event.esgAssessment ? 'ESG review' : undefined,
   ].filter(Boolean) as string[];
 
   return (
@@ -168,7 +168,7 @@ export function RequestInboxWorkspace({
               <DetailRow label="Requestor" value={event.requestor ?? '-'} />
               <DetailRow label="Scope" value={scopeLine(event)} />
               <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
-              <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
+              <DetailRow label="Addressable spend" value={fmtUSD(event.addressable)} />
               {badges.length > 0 && (
                 <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                   {badges.map((badge) => (

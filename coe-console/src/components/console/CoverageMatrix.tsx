@@ -3,6 +3,7 @@ import { REGIONS, REGION_LABEL, type Region } from '../../domain/constants';
 import type { MatrixCell } from '../../domain/selectors';
 import { fmtUSD, fmtPct } from '../../domain/selectors';
 import { coverageLegendGradient, coverageRgb, luminance } from './coverageColors';
+import { EmptyState } from './EmptyState';
 
 function cellVars(coverage: number): React.CSSProperties {
   const [r, g, b] = coverageRgb(coverage).map(Math.round) as [number, number, number];
@@ -29,8 +30,8 @@ export function CoverageMatrix({
   return (
     <Card pad={0}>
       <div className="cov-matrix-head">
-        <CardTitle sub="Coverage intensity by region - click a category to open the deep-dive">
-          Category x Region coverage matrix
+        <CardTitle sub="Spend coverage intensity by region - select a category to inspect the sourcing gap">
+          Category x Region spend coverage
         </CardTitle>
         <div className="cov-legend" aria-hidden="true">
           <span className="cov-legend-cap">Low</span>
@@ -40,7 +41,13 @@ export function CoverageMatrix({
       </div>
 
       <div className="cov-matrix-scroll">
-        <table className="cov-table">
+        {rows.length === 0 ? (
+          <EmptyState
+            title="No filtered coverage results"
+            detail="Clear filters or add addressable spend baseline values to populate the matrix."
+          />
+        ) : (
+        <table className="cov-table" aria-label="Category by region spend coverage matrix">
           <thead>
             <tr>
               <th className="cov-th cov-th--cat">Category</th>
@@ -79,7 +86,7 @@ export function CoverageMatrix({
                   if (cell.addressable === 0 && cell.sourced === 0) {
                     return (
                       <td key={r}>
-                        <div className="cov-cell cov-cell--empty" title="No baseline">
+                        <div className="cov-cell cov-cell--empty" title="No addressable spend baseline">
                           -
                         </div>
                       </td>
@@ -90,7 +97,7 @@ export function CoverageMatrix({
                       <div
                         className="cov-cell"
                         style={cellVars(cell.coverage)}
-                        title={`${fmtUSD(cell.sourced)} sourced of ${fmtUSD(cell.addressable)}`}
+                        title={`${fmtUSD(cell.sourced)} sourced spend of ${fmtUSD(cell.addressable)} addressable spend`}
                       >
                         <span className="cov-cell-pct">{fmtPct(cell.coverage)}</span>
                         <span className="cov-cell-usd">{fmtUSD(cell.sourced)}</span>
@@ -105,6 +112,7 @@ export function CoverageMatrix({
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </Card>
   );

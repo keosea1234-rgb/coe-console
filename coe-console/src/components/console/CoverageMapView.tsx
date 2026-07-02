@@ -232,7 +232,7 @@ export function CoverageMapView({
       <Card pad={0}>
         <div className="coverage-hero-head">
           <CardTitle sub="Spend coverage by region across the current filter scope. Select a region to inspect category and subcategory depth.">
-            Coverage map
+            Regional spend coverage map
           </CardTitle>
           <div className="coverage-zoom">
             <ZoomButton label="Zoom in" onClick={() => zoomBy(1.5)}>
@@ -248,7 +248,7 @@ export function CoverageMapView({
         </div>
 
         <div className="coverage-map-grid">
-          <section className="coverage-map-main" aria-label="Coverage map by region">
+          <section className="coverage-map-main" aria-label="Spend coverage map by region">
             <div
               className="coverage-map-canvas"
               ref={canvasRef}
@@ -376,9 +376,9 @@ export function CoverageMapView({
                         {fmtPct(d.coverage)} <span>coverage</span>
                       </div>
                       <div className="coverage-tip-rows">
-                        <span>Sourced</span>
+                        <span>Sourced spend</span>
                         <b style={numeric}>{fmtUSD(d.sourced)}</b>
-                        <span>Addressable</span>
+                        <span>Addressable spend</span>
                         <b style={numeric}>{fmtUSD(d.addressable)}</b>
                         <span>Untapped</span>
                         <b style={{ ...numeric, color: theme.warning }}>{fmtUSD(d.untapped)}</b>
@@ -475,8 +475,8 @@ function RegionBreakdownPanel({ detail }: { detail: RegionCoverageDetail }) {
       </div>
 
       <div className="coverage-detail-metrics">
-        <Metric label="Sourced" value={fmtUSD(detail.sourced)} />
-        <Metric label="Addressable" value={fmtUSD(detail.addressable)} />
+        <Metric label="Sourced spend" value={fmtUSD(detail.sourced)} />
+        <Metric label="Addressable spend" value={fmtUSD(detail.addressable)} />
         <Metric label="Events" value={String(detail.events)} />
         <Metric label="Untapped gap" value={fmtUSD(detail.untapped)} accent={theme.warning} />
       </div>
@@ -671,7 +671,7 @@ function ZoomButton({
 }
 
 function EmptyRegionMessage() {
-  return <div className="coverage-empty">No coverage data in this filter scope.</div>;
+  return <div className="coverage-empty">No spend coverage data in this filter scope.</div>;
 }
 
 const iconProps = {

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { configureErrorReportingSink, reportClientError } from '../src/lib/errorReporting';
+import {
+  configureErrorReportingSink,
+  reportClientError,
+  sanitizeForErrorReport,
+} from '../src/lib/errorReporting';
 
 test('reportClientError normalizes Error instances', () => {
   const originalConsoleError = console.error;
@@ -19,12 +23,45 @@ test('reportClientError normalizes non-Error values', () => {
   const originalConsoleError = console.error;
   console.error = () => undefined;
   try {
-    const report = reportClientError({ code: 'E_CLIENT' }, { source: 'unhandled-rejection' });
+    const report = reportClientError({ code: 'E_CLIENT', supplierName: 'Sensitive Supplier' }, { source: 'unhandled-rejection' });
     assert.equal(report.source, 'unhandled-rejection');
-    assert.equal(report.message, '{"code":"E_CLIENT"}');
+    assert.equal(report.message, 'Non-error rejection (code, supplierName)');
+    assert.doesNotMatch(report.message, /Sensitive Supplier/);
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+test('error reports redact secrets and personal identifiers before logging', () => {
+  const originalConsoleError = console.error;
+  console.error = () => undefined;
+  try {
+    const report = reportClientError(
+      new Error('Failed for buyer@example.com with token=super-secret and Bearer abc.def.ghi'),
+      { source: 'window-error', componentStack: 'at BuyerForm buyer@example.com password=hunter2' },
+    );
+
+    assert.match(report.message, /\[redacted-email\]/);
+    assert.match(report.message, /token=\[redacted\]/);
+    assert.match(report.message, /Bearer \[redacted\]/);
+    assert.doesNotMatch(report.message, /buyer@example\.com|super-secret|abc\.def\.ghi/);
+    assert.match(report.componentStack ?? '', /\[redacted-email\]/);
+    assert.match(report.componentStack ?? '', /password=\[redacted\]/);
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
+test('sanitizeForErrorReport truncates and redacts sensitive values', () => {
+  const sanitized = sanitizeForErrorReport(
+    `api_key="1234567890abcdef" contact=supplier@example.com ${'x'.repeat(9000)}`,
+  );
+
+  assert.ok(sanitized);
+  assert.ok(sanitized.length <= 8000);
+  assert.match(sanitized, /api_key=\[redacted\]/);
+  assert.match(sanitized, /\[redacted-email\]/);
+  assert.doesNotMatch(sanitized, /1234567890abcdef|supplier@example\.com/);
 });
 
 test('configureErrorReportingSink defaults to disabled (no sink call without explicit opt-in)', () => {

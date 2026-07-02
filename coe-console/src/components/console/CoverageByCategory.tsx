@@ -2,6 +2,7 @@ import { theme } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import type { CategoryCoverage } from '../../domain/selectors';
 import { fmtUSD, fmtPct } from '../../domain/selectors';
+import { EmptyState } from './EmptyState';
 
 export function CoverageByCategory({
   rows,
@@ -15,11 +16,14 @@ export function CoverageByCategory({
   if (visible.length === 0) {
     return (
       <Card>
-        <CardTitle sub="Sourced / addressable - click a bar for subcategory deep-dive">
+        <CardTitle sub="Sourced spend divided by addressable spend - select a category for subcategory detail">
           Spend coverage by category
         </CardTitle>
-        <div style={{ padding: '32px 0', textAlign: 'center', color: theme.textTertiary, fontSize: 13 }}>
-          No category data in the current filter scope.
+        <div style={{ marginTop: 14 }}>
+          <EmptyState
+            title="No category spend in scope"
+            detail="Adjust filters or confirm the addressable spend baseline has values for this category and region mix."
+          />
         </div>
       </Card>
     );
@@ -27,7 +31,7 @@ export function CoverageByCategory({
 
   return (
     <Card>
-      <CardTitle sub="Sourced / addressable - click a bar for subcategory deep-dive">
+      <CardTitle sub="Sourced spend divided by addressable spend - select a category for subcategory detail">
         Spend coverage by category
       </CardTitle>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 14 }}>

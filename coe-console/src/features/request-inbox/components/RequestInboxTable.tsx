@@ -15,6 +15,7 @@ import {
 import { RequestInboxFilters } from './RequestInboxFilters';
 import { formatReceivedAt, isFreshRequest } from '../hooks/useRequestInboxFilters';
 import type { RequestInboxActionState, RequestInboxFilter } from '../model/requestInbox.types';
+import { EmptyState } from '../../../components/console/EmptyState';
 
 const th: CSSProperties = {
   textAlign: 'left',
@@ -144,8 +145,8 @@ export function RequestInboxTable({
               <th style={th}>Requestor</th>
               <th style={th}>Event</th>
               <th style={th}>Category</th>
-              <th style={{ ...th, textAlign: 'right' }}>Addressable</th>
-              <th style={th}>Status</th>
+              <th style={{ ...th, textAlign: 'right' }}>Addressable spend</th>
+              <th style={th}>RFx status</th>
               <th style={th}>Attachments</th>
               <th style={th}>Feedback</th>
               <th style={th}> </th>
@@ -155,7 +156,15 @@ export function RequestInboxTable({
             {visible.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ ...td, textAlign: 'center', color: theme.textTertiary, padding: 32 }}>
-                  No user requests received yet.
+                  <EmptyState
+                    compact
+                    title={requests.length === 0 ? 'No intake requests yet' : 'No requests match this view'}
+                    detail={
+                      requests.length === 0
+                        ? 'Buyer-submitted sourcing requests will appear here after they are submitted.'
+                        : 'Switch between active and archived requests to review a broader set.'
+                    }
+                  />
                 </td>
               </tr>
             ) : (

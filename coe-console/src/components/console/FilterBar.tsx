@@ -145,9 +145,9 @@ export function FilterBar({ summary: summaryOverride }: { summary?: Totals }) {
           >
             <span style={{ color: theme.ink, fontWeight: 700 }}>{fmtNum(summary.events)}</span> events
             <span style={{ color: theme.textTertiary, margin: '0 6px' }}>|</span>
-            <span style={{ color: theme.ink, fontWeight: 700 }}>{fmtUSD(summary.addressable)}</span> addr.
+            <span style={{ color: theme.ink, fontWeight: 700 }}>{fmtUSD(summary.addressable)}</span> addressable
             <span style={{ color: theme.textTertiary, margin: '0 6px' }}>|</span>
-            <span style={{ color: theme.primary, fontWeight: 700 }}>{fmtPct(summary.coverage)}</span> cov.
+            <span style={{ color: theme.primary, fontWeight: 700 }}>{fmtPct(summary.coverage)}</span> coverage
           </div>
         </div>
       </div>

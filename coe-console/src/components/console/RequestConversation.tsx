@@ -172,7 +172,7 @@ export function RequestConversation({
               background: 'rgba(255,255,255,0.72)',
             }}
           >
-            No updates yet.
+            No CoE/requestor updates yet.
           </div>
         ) : (
           ordered.map((update) => {

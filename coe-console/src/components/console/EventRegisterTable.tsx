@@ -10,6 +10,7 @@ import { Button, StatusBadge } from '../common/primitives';
 import { Modal } from '../common/overlays';
 import { openFeedbackEmail } from '../../lib/feedbackEmail';
 import { DataTable, type TableColumn } from '../../shared/table';
+import { EmptyState } from './EmptyState';
 
 function FeedbackButton({
   requested,
@@ -122,7 +123,7 @@ function FeedbackSurveyModal({
         <div style={{ padding: '18px', display: 'grid', gap: 22 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 800, color: theme.ink }}>
-              1. How would you rate the eSourcing tool for this event?
+              1. How effective was the eSourcing support for this event?
             </div>
             <div style={{ fontSize: 11, color: theme.textTertiary, marginTop: 2 }}>
               0 = Would not recommend · 10 = Would definitely recommend
@@ -168,10 +169,14 @@ function FeedbackSurveyModal({
 
 export function EventRegisterTable({
   events,
-  readOnly = false,
+  canUpdateStatus = false,
+  canRequestFeedback = false,
+  canDeleteRequests = false,
 }: {
   events: SourcingEvent[];
-  readOnly?: boolean;
+  canUpdateStatus?: boolean;
+  canRequestFeedback?: boolean;
+  canDeleteRequests?: boolean;
 }) {
   const updateEventStatus = useStore((s) => s.updateEventStatus);
   const requestEventFeedback = useStore((s) => s.requestEventFeedback);
@@ -255,7 +260,7 @@ export function EventRegisterTable({
       },
       {
         id: 'addressable',
-        header: 'Addressable',
+        header: 'Addressable spend',
         align: 'right',
         sortable: true,
         sortValue: (event) => event.addressable,
@@ -263,7 +268,7 @@ export function EventRegisterTable({
       },
       {
         id: 'sourced',
-        header: 'Sourced',
+        header: 'Sourced spend',
         align: 'right',
         sortable: true,
         sortValue: (event) => event.sourced,
@@ -283,17 +288,17 @@ export function EventRegisterTable({
       },
       {
         id: 'status',
-        header: 'Status',
+        header: 'RFx status',
         sortable: true,
         sortValue: (event) => event.status,
-        minWidth: readOnly ? 100 : 210,
+        minWidth: canUpdateStatus ? 210 : 100,
         cell: (event) => (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <StatusBadge status={event.status} />
-            {!readOnly && (
+            {canUpdateStatus && (
               <select
                 className="ui-select"
-                aria-label={`Change status for ${event.name}`}
+                aria-label={`Change RFx status for ${event.name}`}
                 value={event.status}
                 onChange={(selectEvent) => updateEventStatus(event.id, selectEvent.target.value as Status)}
                 style={{
@@ -315,37 +320,47 @@ export function EventRegisterTable({
         ),
       },
     ],
-    [readOnly, updateEventStatus],
+    [canUpdateStatus, updateEventStatus],
   );
+
+  const hasRowActions = canRequestFeedback || canDeleteRequests;
 
   return (
     <Card pad={0}>
       <div style={{ padding: '16px 18px 12px' }}>
-        <CardTitle sub={`Latest ${rows.length} events in scope`}>Event register</CardTitle>
+        <CardTitle sub={`Latest ${rows.length} RFx events in scope`}>Sourcing event register</CardTitle>
       </div>
       <DataTable
         rows={rows}
         columns={columns}
         getRowId={(event) => event.id}
-        emptyMessage="No events in the current filter scope."
+        emptyMessage={
+          <EmptyState
+            compact
+            title="No RFx events match these filters"
+            detail="Clear filters or adjust fiscal year, category, region, or event type to expand the event register."
+          />
+        }
         pageSize={25}
         pageSizeOptions={[10, 25, 50]}
         minWidth={1040}
         maxHeight={520}
         tableLabel="Event register"
         rowActions={
-          readOnly
+          !hasRowActions
             ? undefined
             : (event) => (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <FeedbackButton
-                    requested={event.feedbackRequested}
-                    disabled={false}
-                    onClick={() => setFeedbackEvent(event)}
-                  >
-                    Ask feedback
-                  </FeedbackButton>
-                  {event.requestCreatedAt && (
+                  {canRequestFeedback && (
+                    <FeedbackButton
+                      requested={event.feedbackRequested}
+                      disabled={false}
+                      onClick={() => setFeedbackEvent(event)}
+                    >
+                    Requestor feedback
+                    </FeedbackButton>
+                  )}
+                  {canDeleteRequests && event.requestCreatedAt && (
                     <Button
                       variant="ghost"
                       onClick={() => removeEvent(event.id)}
@@ -357,7 +372,7 @@ export function EventRegisterTable({
                 </div>
               )
         }
-        rowActionsHeader="Ask feedback"
+        rowActionsHeader="Follow-up"
       />
       <FeedbackSurveyModal
         event={feedbackEvent}

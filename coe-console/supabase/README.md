@@ -25,6 +25,8 @@ Open **SQL Editor -> New query** in the Supabase dashboard and run the files in 
 11. `migrations/0011_audit_log_retention.sql` - prune function + optional pg_cron daily schedule for `audit_log` retention.
 12. `migrations/0012_request_updates.sql` - request conversation updates and participant RLS.
 13. `migrations/0013_rls_attachment_hardening.sql` - profile, event, attachment metadata, and attachment download read hardening.
+14. `migrations/0014_dashboard_summary.sql` - dashboard aggregation RPC and supporting indexes.
+15. `migrations/0015_enterprise_esourcing_foundation.sql` - org, supplier, participation, approval, status history, and document workflow foundations.
 
 For each file: paste the contents -> **Run**. You should see a "Success. No rows returned." message. If a statement fails partway through, fix the cause and re-run the whole file.
 
@@ -95,6 +97,21 @@ This reloads the deterministic `generateEvents()` dataset into
 | `audit_log`          | Append-only audit trail for security-sensitive data changes.  |
 | `event_attachments`  | Metadata for files uploaded against a request. Binary in storage. |
 | `client_errors`      | Production client runtime errors (boundary, window, rejections). |
+| `organizations`      | Buyer organizations used to scope future multi-tenant workflows. |
+| `org_memberships`    | User-to-organization memberships for org-scoped RLS. |
+| `suppliers`          | Supplier master records scoped to an organization. |
+| `supplier_contacts`  | Supplier-side contact records, optionally linked to future portal users. |
+| `supplier_event_participation` | Supplier invitations and RFx participation status per event. |
+| `sourcing_event_status_history` | RFx lifecycle history beyond the flat dashboard status. |
+| `approval_requests`  | Event launch, award, and exception approval workflow records. |
+| `document_requirements` | Event or supplier-specific compliance document requirements. |
+| `document_submissions` | Supplier document submission metadata for future portal workflows. |
+
+The enterprise eSourcing foundation keeps the current `sourcing_events` table as
+the dashboard source of truth while adding normalized workflow tables around it.
+New workflow records carry `org_id` and reference the existing text `event_id`,
+so future supplier participation, approvals, and compliance screens can be built
+without a disruptive migration of the current console UI.
 
 ## RLS cheat sheet
 
@@ -107,6 +124,15 @@ This reloads the deterministic `generateEvents()` dataset into
 | `audit_log`          | admin only    | trigger only             | blocked                  | blocked                   |
 | `event_attachments`  | admin / uploader / requestor | owned object + allowed event | blocked                  | admin or uploader         |
 | `client_errors`      | admin only    | self or anon             | blocked                  | blocked                   |
+| `organizations`      | member / admin | admin only              | admin only               | admin only                |
+| `org_memberships`    | self, org member / admin | admin only     | admin only               | admin only                |
+| `suppliers`          | org member, linked contact / admin | admin only | admin only               | admin only                |
+| `supplier_contacts`  | org member, linked contact / admin | admin only | admin only               | admin only                |
+| `supplier_event_participation` | org member, linked contact / admin | admin only | admin only | admin only |
+| `sourcing_event_status_history` | org member / admin | admin only | admin only | admin only |
+| `approval_requests`  | org member, requester, approver / admin | admin only | admin only | admin only |
+| `document_requirements` | org member, linked supplier contact / admin | admin only | admin only | admin only |
+| `document_submissions` | org member, linked supplier contact / admin | linked supplier contact or admin | admin only | admin only |
 
 ## Audit log retention
 

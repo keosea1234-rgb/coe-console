@@ -3,6 +3,7 @@ import { Card, CardTitle } from '../common/Card';
 import { STATUS_COLORS } from '../../domain/constants';
 import type { StatusBucket } from '../../domain/selectors';
 import { fmtUSD, fmtNum } from '../../domain/selectors';
+import { EmptyState } from './EmptyState';
 
 export function PipelineFunnel({ buckets }: { buckets: StatusBucket[] }) {
   const max = Math.max(1, ...buckets.map((b) => b.count));
@@ -10,12 +11,14 @@ export function PipelineFunnel({ buckets }: { buckets: StatusBucket[] }) {
 
   return (
     <Card>
-      <CardTitle sub="By status - bar width by event count">Event pipeline</CardTitle>
+      <CardTitle sub="RFx status mix - bar width by event count">Pipeline opportunity by RFx status</CardTitle>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
         {total === 0 ? (
-          <div style={{ padding: '20px 0', textAlign: 'center', color: theme.textTertiary, fontSize: 13 }}>
-            No events in the current filter scope.
-          </div>
+          <EmptyState
+            compact
+            title="No pipeline events in scope"
+            detail="Adjust filters to include planned, live, or completed sourcing events."
+          />
         ) : (
           buckets.map((b) => {
             const c = STATUS_COLORS[b.status];
@@ -39,7 +42,7 @@ export function PipelineFunnel({ buckets }: { buckets: StatusBucket[] }) {
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    {fmtNum(b.count)} events - {fmtUSD(b.sourced)}
+                    {fmtNum(b.count)} events - {fmtUSD(b.sourced)} sourced spend
                   </span>
                 </div>
                 <div

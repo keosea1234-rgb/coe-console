@@ -9,6 +9,7 @@ import { theme, numeric, sectionLabel } from '../../styles/theme';
 import { Card, CardTitle } from '../common/Card';
 import { Button, StatusBadge } from '../common/primitives';
 import { RequestConversation } from './RequestConversation';
+import { EmptyState } from './EmptyState';
 
 const th: React.CSSProperties = {
   textAlign: 'left',
@@ -68,8 +69,8 @@ function requestBadges(event: SourcingEvent): string[] {
   return [
     event.directness,
     event.shouldCostModeling ? 'Should-cost' : undefined,
-    event.riskAssessment ? 'Risk' : undefined,
-    event.esgAssessment ? 'ESG' : undefined,
+    event.riskAssessment ? 'Risk review' : undefined,
+    event.esgAssessment ? 'ESG review' : undefined,
   ].filter(Boolean) as string[];
 }
 
@@ -134,7 +135,7 @@ export function MyRequests({
         <StatTile label="Submitted" value={requests.length} sub="Total eSourcing requests" />
         <StatTile label="Open" value={openCount} sub="Awaiting CoE pickup" />
         <StatTile label="Managed" value={managedCount} sub="Live, completed, or archived" />
-        <StatTile label="Pipeline" value={fmtUSD(pipeline)} sub="Submitted addressable spend" />
+        <StatTile label="Pipeline opportunity" value={fmtUSD(pipeline)} sub="Submitted addressable spend" />
       </div>
 
       <Card pad={0}>
@@ -157,7 +158,7 @@ export function MyRequests({
               className="ui-btn ui-btn--primary"
               style={{ textDecoration: 'none', height: 30, padding: '6px 11px', fontSize: 12 }}
             >
-              New Event Request
+              New sourcing request
             </Link>
           </div>
         </div>
@@ -169,8 +170,8 @@ export function MyRequests({
                 <th style={th}>Submitted</th>
                 <th style={th}>Request</th>
                 <th style={th}>Scope</th>
-                <th style={{ ...th, textAlign: 'right' }}>Addressable</th>
-                <th style={th}>Status</th>
+                <th style={{ ...th, textAlign: 'right' }}>Addressable spend</th>
+                <th style={th}>RFx status</th>
                 <th style={th}>CoE follow-up</th>
               </tr>
             </thead>
@@ -178,7 +179,11 @@ export function MyRequests({
               {visible.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ ...td, textAlign: 'center', color: theme.textTertiary, padding: 32 }}>
-                    No requests submitted yet.
+                    <EmptyState
+                      compact
+                      title="No sourcing requests yet"
+                      detail="Start a request when you have addressable spend that may need CoE support."
+                    />
                   </td>
                 </tr>
               ) : (
@@ -380,7 +385,7 @@ function MyRequestWorkspace({
             <DetailRow label="Submitted" value={fmtSubmittedAt(event.requestCreatedAt)} />
             <DetailRow label="Scope" value={scopeText(event)} />
             <DetailRow label="Category" value={`${event.category} / ${event.subcategory}`} />
-            <DetailRow label="Addressable" value={fmtUSD(event.addressable)} />
+            <DetailRow label="Addressable spend" value={fmtUSD(event.addressable)} />
             <DetailRow label="Requestor" value={event.requestor ?? '-'} />
             {badges.length > 0 && (
               <div style={{ paddingTop: 10, display: 'flex', gap: 5, flexWrap: 'wrap' }}>

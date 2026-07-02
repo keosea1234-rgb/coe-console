@@ -54,6 +54,29 @@ request form submits a Buyer request, it pushes an event and every console figur
 The editable **Spend data** tab persists the addressable baseline to Supabase;
 coverage = sourced / baseline.
 
+### Enterprise eSourcing foundation
+
+Sprint 7 adds normalized Supabase tables for future enterprise workflows:
+organizations, org memberships, suppliers, supplier contacts, event
+participation, RFx status history, approvals, document requirements, and
+document submissions. These tables wrap the existing `sourcing_events` dashboard
+model with org-scoped ownership, supplier participation, and compliance
+structure, but the current UI intentionally continues to use `sourcing_events`
+until those workflows are built.
+
+Frontend route and action visibility uses a bridge permission model in
+`src/domain/authz.ts`. Permissions are currently derived from `profiles.role`
+for compatibility with existing `user` and `admin` accounts; Supabase RLS
+remains the authoritative enforcement layer for data access.
+
+### Production observability
+
+Production builds capture sanitized browser runtime errors through
+`src/lib/errorReporting.ts`, the React `ErrorBoundary`, and the `client_errors`
+table. Admins can review recent reports in the Console **Errors** tab. See
+`SECURITY.md` for what is captured, what is intentionally excluded, and the
+production troubleshooting flow.
+
 ## Reliability checks
 
 ```bash
@@ -68,7 +91,7 @@ Covered tests:
 - KPI, coverage, region attribution, pipeline and savings trend selectors.
 - Request form validation and event payload creation.
 - Request intake -> admin status/feedback/archive -> buyer feedback store workflow.
-- Client error reporting normalization + sink opt-in safety.
+- Client error reporting normalization, sanitization, and sink opt-in safety.
 - RLS smoke suite (`tests/rls.test.ts`) — skipped without `SUPABASE_TEST_*`
   env vars; see `supabase/README.md` for the setup runbook.
 

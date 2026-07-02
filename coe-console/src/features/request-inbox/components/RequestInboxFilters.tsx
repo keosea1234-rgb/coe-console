@@ -29,7 +29,7 @@ export function RequestInboxFilters({
         flexWrap: 'wrap',
       }}
     >
-      <CardTitle sub={`${requestCount} request${requestCount === 1 ? '' : 's'} received from users`}>
+      <CardTitle sub={`${requestCount} buyer request${requestCount === 1 ? '' : 's'} received for CoE triage`}>
         Request inbox
       </CardTitle>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -45,7 +45,7 @@ export function RequestInboxFilters({
             fontFamily: theme.mono,
           }}
         >
-          Pipeline {fmtUSD(totalSpend)}
+          Pipeline opportunity {fmtUSD(totalSpend)}
         </div>
         <div
           style={{
@@ -63,6 +63,7 @@ export function RequestInboxFilters({
               <button
                 key={item}
                 type="button"
+                aria-pressed={active}
                 onClick={() => onFilterChange(item)}
                 style={{
                   height: 24,

@@ -18,7 +18,7 @@ export function RequestStatusControl({
       <StatusBadge status={event.status} />
       <select
         className="ui-select"
-        aria-label={`Change status for ${event.name}`}
+        aria-label={`Change RFx status for ${event.name}`}
         value={event.status}
         disabled={busy}
         onChange={(selectEvent) => onStatusChange(event.id, selectEvent.target.value as Status)}
@@ -88,6 +88,7 @@ export function RequestFeedbackAction({
       variant="secondary"
       disabled={busy || !canEmailFeedback(event)}
       onClick={onRequest}
+      ariaLabel={`Request post-event feedback for ${event.name}`}
       style={{
         height: 28,
         padding: '6px 10px',

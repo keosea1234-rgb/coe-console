@@ -8,8 +8,8 @@ import { ProgressBar } from '../common/primitives';
 export function RegionPerformance({ rows }: { rows: RegionPerf[] }) {
   return (
     <Card>
-      <CardTitle sub="Sourced spend, coverage and auction share by business group">
-        Region / BG performance
+      <CardTitle sub="Sourced spend, spend coverage, and auction effectiveness by business group">
+        Regional procurement performance
       </CardTitle>
       <div
         style={{
@@ -56,10 +56,10 @@ export function RegionPerformance({ rows }: { rows: RegionPerf[] }) {
               {fmtUSD(r.sourced)}
             </div>
             <div>
-              <Row label="Coverage" value={fmtPct(r.coverage)} />
+              <Row label="Spend coverage" value={fmtPct(r.coverage)} />
               <ProgressBar value={r.coverage} color={theme.primary} height={5} />
             </div>
-            <Row label="Auction share" value={fmtPct(r.auctionShare)} />
+            <Row label="Auction effectiveness" value={fmtPct(r.auctionShare)} />
           </div>
         ))}
       </div>

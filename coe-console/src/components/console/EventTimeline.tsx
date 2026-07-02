@@ -4,6 +4,7 @@ import { CATEGORY_BY_NAME } from '../../domain/categories';
 import type { SourcingEvent } from '../../domain/types';
 import { fmtUSD } from '../../domain/selectors';
 import { StatusBadge } from '../common/primitives';
+import { EmptyState } from './EmptyState';
 
 export function EventTimeline({ events }: { events: SourcingEvent[] }) {
   const today = new Date('2026-06-24');
@@ -15,7 +16,7 @@ export function EventTimeline({ events }: { events: SourcingEvent[] }) {
 
   return (
     <Card>
-      <CardTitle sub="Next 12 by start date">Live &amp; upcoming events</CardTitle>
+      <CardTitle sub="Next 12 planned or live RFx events by start date">Live &amp; upcoming RFx events</CardTitle>
       {upcoming.length === 0 ? (
         <Empty />
       ) : (
@@ -100,7 +101,7 @@ export function EventTimeline({ events }: { events: SourcingEvent[] }) {
                       marginTop: 2,
                     }}
                   >
-                    {e.id} - {(e.eventTypes ?? [e.type]).join(' + ')} - {fmtUSD(e.addressable)}
+                    {e.id} - {(e.eventTypes ?? [e.type]).join(' + ')} - {fmtUSD(e.addressable)} addressable spend
                   </div>
                 </div>
                 <StatusBadge status={e.status} />
@@ -115,16 +116,12 @@ export function EventTimeline({ events }: { events: SourcingEvent[] }) {
 
 function Empty() {
   return (
-    <div
-      style={{
-        padding: '28px 0',
-        textAlign: 'center',
-        color: theme.textTertiary,
-        fontSize: 13,
-        marginTop: 8,
-      }}
-    >
-      No live or upcoming events in the current scope.
+    <div style={{ marginTop: 12 }}>
+      <EmptyState
+        compact
+        title="No live or upcoming RFx events"
+        detail="Adjust filters or add planned sourcing events to populate the timeline."
+      />
     </div>
   );
 }

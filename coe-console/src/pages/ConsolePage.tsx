@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../domain/store';
 import { useSession } from '../domain/session';
+import { hasPermission } from '../domain/authz';
 import { isDemoModeEnabled, listDashboardSummary } from '../domain/repository';
 import {
   applyFilters,
@@ -39,11 +40,17 @@ import { WeeklyReports } from '../components/console/WeeklyReports';
 import { RequestInbox } from '../components/console/RequestInbox';
 import { MyRequests } from '../components/console/MyRequests';
 import { TemplatesLearningTab } from '../components/console/TemplatesLearningTab';
+import { ClientErrorLog } from '../components/console/ClientErrorLog';
 
 export function ConsolePage() {
   const { events, filters, baseline, loading, error, clearError } = useStore();
   const user = useSession((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const canViewOwnRequests = hasPermission(user, 'request:view_own');
+  const canViewRequestInbox = hasPermission(user, 'request:view_all');
+  const canUpdateEventStatus = hasPermission(user, 'event:update_status');
+  const canAdminEvents = hasPermission(user, 'event:admin');
+  const canRequestFeedback = hasPermission(user, 'feedback:request');
+  const canViewErrors = hasPermission(user, 'admin:audit');
   const demoMode = isDemoModeEnabled();
   const [tab, setTab] = useState<ConsoleTab>('exec');
   const [reportsOpen, setReportsOpen] = useState(false);
@@ -51,13 +58,15 @@ export function ConsolePage() {
   const [dashboardSummaryState, setDashboardSummaryState] = useState<{
     key: string;
     summary: DashboardSummary;
+    loadedAt: string;
   } | null>(null);
 
-  // If a user lands on an admin-only tab (e.g., after sign-out/in), bounce them back.
+  // If permissions change after sign-out/in, bounce away from tabs the user can no longer access.
   useEffect(() => {
-    if (!isAdmin && (tab === 'spend' || tab === 'inbox')) setTab('exec');
-    if (isAdmin && tab === 'myRequests') setTab('exec');
-  }, [isAdmin, tab]);
+    if ((!canAdminEvents && tab === 'spend') || (!canViewRequestInbox && tab === 'inbox')) setTab('exec');
+    if (!canViewErrors && tab === 'errors') setTab('exec');
+    if (!canViewOwnRequests && tab === 'myRequests') setTab('exec');
+  }, [canAdminEvents, canViewErrors, canViewOwnRequests, canViewRequestInbox, tab]);
 
   // Auto-dismiss transient mutation errors so the banner doesn't linger.
   useEffect(() => {
@@ -79,7 +88,7 @@ export function ConsolePage() {
 
     void listDashboardSummary(filters)
       .then((summary) => {
-        if (active) setDashboardSummaryState({ key: summaryKey, summary });
+        if (active) setDashboardSummaryState({ key: summaryKey, summary, loadedAt: new Date().toISOString() });
       })
       .catch((err) => {
         console.warn('[dashboard] server summary unavailable; falling back to client selectors', err);
@@ -93,6 +102,9 @@ export function ConsolePage() {
 
   const dashboardSummary =
     !demoMode && dashboardSummaryState?.key === summaryKey ? dashboardSummaryState.summary : null;
+  const freshness = dashboardSummary
+    ? { label: 'Supabase dashboard summary', loadedAt: dashboardSummaryState?.loadedAt }
+    : { label: demoMode ? 'Demo dataset' : 'Client-calculated fallback', loadedAt: new Date().toISOString() };
 
   const filtered = useMemo(() => applyFilters(events, filters), [events, filters]);
   const clientTotals = useMemo(() => computeTotals(filtered, filters, baseline), [filtered, filters, baseline]);
@@ -141,9 +153,10 @@ export function ConsolePage() {
         pendingRequests={pendingRequests}
         myRequests={myRequests.length}
       />
-      {tab !== 'templatesLearning' && <FilterBar summary={totals} />}
+      {tab !== 'templatesLearning' && tab !== 'errors' && <FilterBar summary={totals} />}
 
       <div className="app-content fade-up">
+        {tab !== 'templatesLearning' && tab !== 'errors' && <DataFreshnessIndicator {...freshness} />}
         {error && (
           <div
             role="alert"
@@ -182,7 +195,7 @@ export function ConsolePage() {
           </div>
         )}
 
-        {loading && tab !== 'templatesLearning' ? (
+        {loading && tab !== 'templatesLearning' && tab !== 'errors' ? (
           <div
             style={{
               display: 'grid',
@@ -231,24 +244,31 @@ export function ConsolePage() {
                   <PipelineFunnel buckets={pipeline} />
                   <EventTimeline events={filtered} />
                 </div>
-                <EventRegisterTable events={filtered} readOnly={!isAdmin} />
+                <EventRegisterTable
+                  events={filtered}
+                  canUpdateStatus={canUpdateEventStatus}
+                  canRequestFeedback={canRequestFeedback}
+                  canDeleteRequests={canAdminEvents}
+                />
                 <CoverageMatrix rows={matrix} onSelect={openDive} />
               </>
             )}
 
-            {tab === 'spend' && isAdmin && <SpendBaselineGrid />}
+            {tab === 'spend' && canAdminEvents && <SpendBaselineGrid />}
 
-            {tab === 'inbox' && isAdmin && <RequestInbox events={events} />}
+            {tab === 'inbox' && canViewRequestInbox && <RequestInbox events={events} />}
 
-            {tab === 'myRequests' && !isAdmin && <MyRequests events={events} user={user} />}
+            {tab === 'myRequests' && canViewOwnRequests && <MyRequests events={events} user={user} />}
 
             {tab === 'templatesLearning' && <TemplatesLearningTab />}
+
+            {tab === 'errors' && canViewErrors && <ClientErrorLog />}
           </>
         )}
       </div>
 
       <SubcategoryDeepDive data={dive} onClose={() => setDive(null)} />
-      {isAdmin && (
+      {canAdminEvents && (
         <WeeklyReports open={reportsOpen} onClose={() => setReportsOpen(false)} totals={totals} />
       )}
 
@@ -265,6 +285,41 @@ export function ConsolePage() {
         eSourcing CoE Console - coverage = sourced / addressable
         {demoMode ? ' - demo data mode enabled' : ''}
       </footer>
+    </div>
+  );
+}
+
+function DataFreshnessIndicator({ label, loadedAt }: { label: string; loadedAt?: string }) {
+  const timestamp = loadedAt ? new Date(loadedAt) : null;
+  const display = timestamp && !Number.isNaN(timestamp.getTime())
+    ? timestamp.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'refreshing';
+
+  return (
+    <div
+      aria-live="polite"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+        color: theme.textSecondary,
+        fontSize: 11.5,
+        fontFamily: theme.mono,
+      }}
+    >
+      <span>
+        Data source: <strong style={{ color: theme.ink }}>{label}</strong>
+      </span>
+      <span>
+        Last refreshed: <strong style={{ color: theme.ink }}>{display}</strong>
+      </span>
     </div>
   );
 }

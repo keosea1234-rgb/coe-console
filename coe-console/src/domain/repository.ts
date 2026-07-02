@@ -13,6 +13,7 @@ type FeedbackResponseRow = Database['public']['Tables']['feedback_responses']['R
 type FeedbackResponseInsert = Database['public']['Tables']['feedback_responses']['Insert'];
 type RequestUpdateRow = Database['public']['Tables']['request_updates']['Row'];
 type RequestUpdateInsert = Database['public']['Tables']['request_updates']['Insert'];
+type ClientErrorRow = Database['public']['Tables']['client_errors']['Row'];
 type DashboardSummaryFunction = Database['public']['Functions']['dashboard_summary'];
 type LegacySourcingEventRow = Omit<SourcingEventRow, 'status'> & {
   status: SourcingEventRow['status'] | 'Awarded';
@@ -45,6 +46,19 @@ export interface DashboardSummaryRpcRow {
   status_counts: unknown;
   category_counts: unknown;
   region_counts: unknown;
+}
+
+export interface ClientErrorLogEntry {
+  id: string;
+  source: ClientErrorRow['source'];
+  message: string;
+  stack?: string;
+  componentStack?: string;
+  route?: string;
+  userAgent?: string;
+  appVersion?: string;
+  actorId?: string;
+  reportedAt: string;
 }
 
 export function rowToEvent(r: LegacySourcingEventRow): SourcingEvent {
@@ -128,6 +142,21 @@ function rowToRequestUpdate(r: RequestUpdateRow): RequestUpdate {
     authorRole: r.author_role,
     body: r.body,
     createdAt: r.created_at,
+  };
+}
+
+function rowToClientError(r: ClientErrorRow): ClientErrorLogEntry {
+  return {
+    id: r.id,
+    source: r.source,
+    message: r.message,
+    stack: r.stack ?? undefined,
+    componentStack: r.component_stack ?? undefined,
+    route: r.route ?? undefined,
+    userAgent: r.user_agent ?? undefined,
+    appVersion: r.app_version ?? undefined,
+    actorId: r.actor_id ?? undefined,
+    reportedAt: r.reported_at,
   };
 }
 
@@ -400,6 +429,16 @@ export async function listRequestUpdates(): Promise<RequestUpdate[]> {
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data as RequestUpdateRow[]).map(rowToRequestUpdate);
+}
+
+export async function listClientErrors(limit = 100): Promise<ClientErrorLogEntry[]> {
+  const { data, error } = await supabase
+    .from('client_errors')
+    .select('id, source, message, stack, component_stack, route, user_agent, app_version, actor_id, reported_at')
+    .order('reported_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data as ClientErrorRow[]).map(rowToClientError);
 }
 
 export async function insertRequestUpdate(input: {

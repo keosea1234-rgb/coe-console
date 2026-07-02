@@ -14,6 +14,7 @@ export function Button({
   className,
   style,
   form,
+  ariaLabel,
 }: {
   children: ReactNode;
   variant?: BtnVariant;
@@ -23,10 +24,19 @@ export function Button({
   className?: string;
   style?: CSSProperties;
   form?: string;
+  ariaLabel?: string;
 }) {
   const cls = `ui-btn ui-btn--${variant}${className ? ` ${className}` : ''}`;
   return (
-    <button type={type} form={form} disabled={disabled} onClick={onClick} className={cls} style={style}>
+    <button
+      type={type}
+      form={form}
+      disabled={disabled}
+      onClick={onClick}
+      className={cls}
+      style={style}
+      aria-label={ariaLabel}
+    >
       {children}
     </button>
   );
@@ -39,12 +49,14 @@ export function KpiCard({
   sub,
   children,
   accent,
+  helpText,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   children?: ReactNode;
   accent?: string;
+  helpText?: string;
 }) {
   return (
     <div
@@ -57,7 +69,33 @@ export function KpiCard({
         minHeight: 108,
       }}
     >
-      <div style={sectionLabel}>{label}</div>
+      <div style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span>{label}</span>
+        {helpText && (
+          <span
+            tabIndex={0}
+            role="img"
+            aria-label={`${label} definition: ${helpText}`}
+            title={helpText}
+            style={{
+              display: 'inline-grid',
+              placeItems: 'center',
+              width: 17,
+              height: 17,
+              borderRadius: 999,
+              border: `1px solid ${theme.borderStrong}`,
+              background: theme.surfaceRaised,
+              color: theme.textSecondary,
+              fontSize: 11,
+              fontWeight: 900,
+              lineHeight: 1,
+              cursor: 'help',
+            }}
+          >
+            ?
+          </span>
+        )}
+      </div>
       <div
         style={{
           fontSize: 25,
